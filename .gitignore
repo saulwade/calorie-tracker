@@ -1,0 +1,26 @@
+# dependencias
+/node_modules
+
+# next
+/.next
+/out
+next-env.d.ts
+
+# produccion
+/build
+
+# entorno (¡NUNCA subir tus llaves!)
+.env
+.env.local
+.env*.local
+
+# base de datos local
+*.db
+*.db-journal
+local.db*
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+.vercel
