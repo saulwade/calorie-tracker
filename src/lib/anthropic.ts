@@ -116,8 +116,25 @@ const FOOD_TOOL: Anthropic.Tool = {
         description:
           "Consejo breve de nutriólogo (1 frase), en español, SIN emojis, en PORCIONES DE COMIDA REAL (nunca gramos). Motivador.",
       },
+      micros: {
+        type: "object",
+        description:
+          "Estimación de RESPALDO de micronutrientes TOTALES de la comida (se usa solo si la base de datos USDA no está disponible). Usa las unidades indicadas; 0 si no hay nada relevante.",
+        properties: {
+          iron: { type: "number", description: "Hierro (mg)" },
+          potassium: { type: "number", description: "Potasio (mg)" },
+          magnesium: { type: "number", description: "Magnesio (mg)" },
+          zinc: { type: "number", description: "Zinc (mg)" },
+          calcium: { type: "number", description: "Calcio (mg)" },
+          vitC: { type: "number", description: "Vitamina C (mg)" },
+          vitD: { type: "number", description: "Vitamina D (mcg)" },
+          vitB12: { type: "number", description: "Vitamina B12 (mcg)" },
+          omega3: { type: "number", description: "Omega-3 (g)" },
+        },
+        required: ["iron", "potassium", "magnesium", "zinc", "calcium", "vitC", "vitD", "vitB12", "omega3"],
+      },
     },
-    required: ["name", "ingredientes", "confidence", "notes", "score", "tip"],
+    required: ["name", "ingredientes", "confidence", "notes", "score", "tip", "micros"],
   },
 };
 
@@ -219,6 +236,7 @@ export async function analyzeFood({
     notes?: string;
     score?: number;
     tip?: string;
+    micros?: Partial<MealMicros>;
   };
 
   const ings = Array.isArray(input.ingredientes) ? input.ingredientes : [];
@@ -275,6 +293,35 @@ export async function analyzeFood({
   const sum = (k: keyof Nutrients) =>
     Math.round(computed.reduce((a, c) => a + (c.n[k] || 0), 0) * 10) / 10;
 
+  // Micros: si algún ingrediente se resolvió con USDA, usa la suma (precisa).
+  // Si NINGUNO se resolvió (USDA no disponible), usa la estimación de la IA,
+  // para que los micros NUNCA queden en 0 por falta de la base.
+  const usedUsda = computed.some((c) => c.item.fuente === "USDA");
+  const llm = (input.micros ?? {}) as Partial<MealMicros>;
+  const micros: MealMicros = usedUsda
+    ? {
+        iron: sum("iron"),
+        potassium: sum("potassium"),
+        magnesium: sum("magnesium"),
+        zinc: sum("zinc"),
+        calcium: sum("calcium"),
+        vitC: sum("vitC"),
+        vitD: sum("vitD"),
+        vitB12: sum("vitB12"),
+        omega3: sum("omega3"),
+      }
+    : {
+        iron: num(llm.iron),
+        potassium: num(llm.potassium),
+        magnesium: num(llm.magnesium),
+        zinc: num(llm.zinc),
+        calcium: num(llm.calcium),
+        vitC: num(llm.vitC),
+        vitD: num(llm.vitD),
+        vitB12: num(llm.vitB12),
+        omega3: num(llm.omega3),
+      };
+
   return {
     name: input.name ?? "Comida",
     calories: sum("calories"),
@@ -285,17 +332,7 @@ export async function analyzeFood({
     sodium: sum("sodium"),
     sugar: sum("sugar"),
     vitamins: [],
-    micros: {
-      iron: sum("iron"),
-      potassium: sum("potassium"),
-      magnesium: sum("magnesium"),
-      zinc: sum("zinc"),
-      calcium: sum("calcium"),
-      vitC: sum("vitC"),
-      vitD: sum("vitD"),
-      vitB12: sum("vitB12"),
-      omega3: sum("omega3"),
-    },
+    micros,
     confidence: input.confidence ?? "media",
     notes: input.notes ?? "",
     score: typeof input.score === "number" ? input.score : num(input.score),
