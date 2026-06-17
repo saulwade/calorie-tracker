@@ -38,6 +38,14 @@ export default function TotalsBar({
   onToggle: () => void;
   day: string;
 }) {
+  // Balance sodio/potasio (retención de agua): solo avisa cuando vale la pena.
+  const naHigh = totals.sodium > profile.targetSodium * 0.8;
+  const kLow = totals.potassium > 0 && totals.potassium < totals.sodium;
+  const naKHint =
+    naHigh || (kLow && totals.sodium > 800)
+      ? "Sodio alto frente al potasio: toma agua y suma potasio (plátano, espinaca, frijol) para no retener líquido."
+      : "";
+
   return (
     <div className="mx-auto w-full max-w-md px-3">
       {open && (
@@ -101,6 +109,12 @@ export default function TotalsBar({
               /{profile.targetSodium}mg
             </span>
           </div>
+
+          {naKHint && (
+            <p className="mt-3 rounded-xl bg-[var(--color-cal)]/8 px-3 py-2 text-[12px] leading-snug text-[var(--color-text)]">
+              {naKHint}
+            </p>
+          )}
 
           <MicroGrid totals={totals} />
 

@@ -1,16 +1,18 @@
 import { db, schema } from "@/db";
 import { type Profile } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { calcTargets, type ActivityLevel } from "./nutrition";
+import { currentTrend } from "./weight";
 
-/** Peso más reciente registrado (para ajustar el plan automáticamente). */
-async function getLatestWeight(): Promise<number | null> {
+/**
+ * Peso de TENDENCIA (media móvil), para ajustar el plan sin el ruido del día.
+ * Usa todos los registros; si no hay, null.
+ */
+async function getTrendWeight(): Promise<number | null> {
   const rows = await db
-    .select()
-    .from(schema.weights)
-    .orderBy(desc(schema.weights.day))
-    .limit(1);
-  return rows[0]?.weightKg ?? null;
+    .select({ day: schema.weights.day, weightKg: schema.weights.weightKg })
+    .from(schema.weights);
+  return currentTrend(rows);
 }
 
 /** Obtiene el perfil (id=1). Si no existe, lo crea con valores por defecto. */
@@ -65,9 +67,9 @@ export async function updateProfile(update: ProfileUpdate): Promise<Profile> {
     deficit: clamp(update.deficit ?? current.deficit, 0, 1500),
   };
 
-  // El plan se ajusta a tu peso MÁS RECIENTE (si ya registraste alguno),
-  // así las metas bajan contigo conforme adelgazas. Si no hay registro, usa el inicial.
-  const currentWeight = (await getLatestWeight()) ?? merged.startWeightKg;
+  // El plan se ajusta a tu peso de TENDENCIA (suavizado), así las metas bajan
+  // contigo sin reaccionar al ruido diario. Si no hay registro, usa el inicial.
+  const currentWeight = (await getTrendWeight()) ?? merged.startWeightKg;
 
   const t = calcTargets({
     sex: merged.sex,
