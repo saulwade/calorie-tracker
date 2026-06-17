@@ -21,6 +21,8 @@ Tracker personal de calorías y macros. Registra lo que comes con **foto, texto 
 
    (Opcional) cambia `APP_PASSWORD=tracker` por la contraseña que quieras.
 
+   **Recomendado — nutrición precisa:** saca una llave gratis de USDA FoodData Central en https://fdc.nal.usda.gov/api-key-signup (1 min, te llega por correo) y ponla en `USDA_API_KEY=`. Con ella, la nutrición de cada comida se calcula con la base de datos oficial del USDA (precisa y consistente) en vez de estimarse. Sin ella, la app sigue funcionando con estimación de IA.
+
 2. **Arranca la app:**
 
    ```bash

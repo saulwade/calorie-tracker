@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { lookupNutrients, type Nutrients } from "./usda";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Sonnet por defecto: suficiente para estimar nutrición y mucho más barato que Opus.
@@ -16,6 +17,13 @@ export interface MealMicros {
   omega3: number; // g
 }
 
+export interface MealItem {
+  nombre: string;
+  gramos: number;
+  kcal: number;
+  fuente: "USDA" | "estimado";
+}
+
 export interface FoodAnalysis {
   name: string;
   calories: number;
@@ -31,126 +39,98 @@ export interface FoodAnalysis {
   notes: string;
   score: number;
   tip: string;
+  items: MealItem[];
 }
 
-// Herramienta que fuerza a Claude a devolver la nutrición en formato estructurado.
+// Herramienta: Claude DESCOMPONE la comida en ingredientes + gramos. Los números
+// nutricionales se calculan después con la base USDA (no los inventa el modelo).
 const FOOD_TOOL: Anthropic.Tool = {
   name: "registrar_comida",
   description:
-    "Registra el desglose nutricional estimado de la comida descrita o mostrada en la foto.",
+    "Descompone la comida en ingredientes con su porción en gramos. La nutrición se calcula con una base de datos a partir de eso.",
   input_schema: {
     type: "object",
     properties: {
       name: {
         type: "string",
         description:
-          "Descripción corta de la comida en español, incluyendo porción estimada. Ej: 'Bowl de pollo de Chipotle (2/3 lleno)'",
+          "Descripción corta de la comida en español con su porción. Ej: 'Bowl de pollo con arroz y frijoles'",
       },
-      calories: { type: "number", description: "Calorías totales (kcal)" },
-      protein: { type: "number", description: "Proteína total (gramos)" },
-      carbs: { type: "number", description: "Carbohidratos totales (gramos)" },
-      fat: { type: "number", description: "Grasa total (gramos)" },
-      fiber: { type: "number", description: "Fibra total (gramos)" },
-      sodium: { type: "number", description: "Sodio total (miligramos)" },
-      sugar: { type: "number", description: "Azúcar total (gramos)" },
-      vitamins: {
+      ingredientes: {
         type: "array",
         description:
-          "Vitaminas y minerales destacables de esta comida (los más relevantes, 0-6 items). Vacío si no hay nada notable.",
+          "Ingredientes del platillo, cada uno con su porción en GRAMOS como se comió (ya cocido). Incluye aceites/grasas de cocción visibles. 1-10 items.",
         items: {
           type: "object",
           properties: {
-            name: { type: "string", description: "Ej: 'Vitamina C', 'Hierro'" },
-            amount: { type: "number" },
-            unit: { type: "string", description: "Ej: 'mg', 'mcg', 'UI'" },
-            pctDV: {
-              type: "number",
-              description: "% del valor diario recomendado, si aplica",
+            nombre: {
+              type: "string",
+              description: "Nombre en español (ej. 'Pechuga de pollo a la plancha').",
             },
+            usdaQuery: {
+              type: "string",
+              description:
+                "Término de búsqueda en INGLÉS para la base USDA, específico y como se come, sin marcas (ej. 'chicken breast cooked', 'white rice cooked', 'corn tortilla', 'black beans cooked', 'banana raw', 'olive oil', 'whole egg cooked').",
+            },
+            gramos: { type: "number", description: "Gramos estimados de ESTE ingrediente, como se comió." },
+            kcal: { type: "number", description: "Respaldo (por si la base falla): calorías de este ingrediente." },
+            protein: { type: "number", description: "Respaldo: proteína (g)." },
+            carbs: { type: "number", description: "Respaldo: carbohidratos (g)." },
+            fat: { type: "number", description: "Respaldo: grasa (g)." },
+            fiber: { type: "number", description: "Respaldo: fibra (g)." },
+            sodium: { type: "number", description: "Respaldo: sodio (mg)." },
+            sugar: { type: "number", description: "Respaldo: azúcar (g)." },
           },
-          required: ["name", "amount", "unit"],
+          required: [
+            "nombre",
+            "usdaQuery",
+            "gramos",
+            "kcal",
+            "protein",
+            "carbs",
+            "fat",
+            "fiber",
+            "sodium",
+            "sugar",
+          ],
         },
       },
       confidence: {
         type: "string",
         enum: ["alta", "media", "baja"],
         description:
-          "Qué tan seguro estás. 'alta' si tienes foto + descripción clara; 'baja' si falta info de porción o ingredientes.",
+          "Qué tan seguro estás de la PORCIÓN (gramos). 'alta' si hay foto clara, etiqueta o cantidades exactas; 'baja' si la porción es muy incierta.",
       },
       notes: {
         type: "string",
         description:
-          "En 1-2 frases: en qué te basaste para el cálculo y qué asumiste (porción, ingredientes, preparación). Como un breve razonamiento. En español.",
+          "1-2 frases: qué asumiste de porciones/ingredientes/preparación. En español.",
       },
       score: {
         type: "number",
         description:
-          "Calificación de 0 a 10 de qué tan saludable y alineada está esta comida con el objetivo del usuario (bajar de peso de forma sana). 10 = excelente; 5 = regular; <4 = poco saludable. Usa decimales si quieres (ej. 7.5).",
+          "Calificación de 0 a 10 de qué tan saludable y alineada está con bajar de peso de forma sana. Decimales permitidos.",
       },
       tip: {
         type: "string",
         description:
-          "Consejo breve y amable de nutriólogo (1 frase), en español, SIN emojis. Da sugerencias en PORCIONES DE COMIDA REAL, nunca en gramos (ej. 'cambia el refresco por agua' o 'agrega una palma de pollo'). Motivador, no regañón.",
-      },
-      micros: {
-        type: "object",
-        description:
-          "Micronutrientes clave para energía presentes en ESTA comida (la porción descrita). Usa SIEMPRE las unidades indicadas. Si un micro es ~0 en esta comida, pon 0. No los dejes vacíos.",
-        properties: {
-          iron: { type: "number", description: "Hierro (mg)" },
-          potassium: { type: "number", description: "Potasio (mg)" },
-          magnesium: { type: "number", description: "Magnesio (mg)" },
-          zinc: { type: "number", description: "Zinc (mg)" },
-          calcium: { type: "number", description: "Calcio (mg)" },
-          vitC: { type: "number", description: "Vitamina C (mg)" },
-          vitD: { type: "number", description: "Vitamina D (mcg)" },
-          vitB12: { type: "number", description: "Vitamina B12 (mcg)" },
-          omega3: { type: "number", description: "Omega-3 ALA+EPA+DHA (g)" },
-        },
-        required: [
-          "iron",
-          "potassium",
-          "magnesium",
-          "zinc",
-          "calcium",
-          "vitC",
-          "vitD",
-          "vitB12",
-          "omega3",
-        ],
+          "Consejo breve de nutriólogo (1 frase), en español, SIN emojis, en PORCIONES DE COMIDA REAL (nunca gramos). Motivador.",
       },
     },
-    required: [
-      "name",
-      "calories",
-      "protein",
-      "carbs",
-      "fat",
-      "fiber",
-      "sodium",
-      "sugar",
-      "vitamins",
-      "confidence",
-      "notes",
-      "score",
-      "tip",
-      "micros",
-    ],
+    required: ["name", "ingredientes", "confidence", "notes", "score", "tip"],
   },
 };
 
-const SYSTEM = `Eres un asistente de nutrición experto y meticuloso. Estimas el contenido nutricional de lo que come el usuario de la forma MÁS PRECISA posible.
+const SYSTEM = `Eres un asistente de nutrición experto. Tu trabajo es DESCOMPONER lo que comió el usuario en ingredientes con su porción en GRAMOS — NO inventes los números nutricionales, esos se calculan después con una base de datos (USDA).
 
 Cómo trabajar:
-- Cuando haya FOTO(S) y DESCRIPCIÓN juntas, ÚSALAS COMBINADAS: la foto te da la porción y el contexto visual; el texto te da lo que la foto no muestra (ingredientes, marca, preparación, cantidades exactas). Cruza ambas fuentes.
-- Puede subir VARIAS fotos (ej. la TABLA NUTRICIONAL/etiqueta del producto y el platillo). Si ves una tabla nutricional, úsala como fuente PRINCIPAL y ajústala según la porción que describió el usuario (ej. "me comí media bolsa").
-- Si la foto no alcanza a mostrar algo, complétalo con el texto; si el texto es vago, apóyate en la foto.
-- Estima la porción usando referencias visuales (plato, cubiertos, mano, envase) o las cantidades que diga el usuario.
-- Usa valores nutricionales realistas de alimentos y marcas comunes (incluye comida mexicana/latina: tortillas, salsas, aceite de cocina, etc.).
-- Si hay incertidumbre, elige una porción típica, decláralo en 'notes' y baja la 'confidence'. No inventes precisión falsa.
-- En 'notes' deja un breve razonamiento (1-2 frases) de en qué te basaste.
-- Además eres su tutor de nutrición: califica la comida (0-10) según qué tan saludable y alineada está con su objetivo, y da un 'tip' corto y amable. Los consejos van en PORCIONES DE COMIDA REAL (una palma de pollo, un puño de arroz, una fruta), NUNCA en gramos.
-- Responde SIEMPRE llamando a la herramienta 'registrar_comida', sin texto extra. Todo en español.`;
+- Identifica cada ingrediente del platillo y estima sus GRAMOS como se comió (ya cocido). Incluye aceites/grasas de cocción visibles, salsas, aderezos.
+- Para cada ingrediente da un 'usdaQuery' en INGLÉS, específico y sin marcas (ej. 'white rice cooked', 'chicken breast grilled', 'corn tortilla', 'black beans cooked').
+- Si hay FOTO(S), úsalas para identificar ingredientes y estimar porciones (referencias: plato, cubiertos, mano). Si hay una TABLA NUTRICIONAL/etiqueta, básate en ella y en la porción descrita.
+- Da también una estimación de respaldo (kcal/macros) por ingrediente, por si la base de datos no encuentra ese alimento.
+- La 'confidence' refleja qué tan seguro estás de la PORCIÓN (los gramos), que es la mayor incertidumbre. Sé honesto.
+- Eres su tutor: califica (0-10) y da un 'tip' corto en porciones reales (nunca gramos), sin emojis.
+- Responde SIEMPRE llamando a 'registrar_comida'. Todo en español.`;
 
 type ImageInput = { base64: string; mediaType: string };
 
@@ -220,44 +200,113 @@ export async function analyzeFood({
     throw new Error("Claude no devolvió un análisis estructurado.");
   }
 
-  const input = toolUse.input as Partial<FoodAnalysis>;
+  type Ingredient = {
+    nombre?: string;
+    usdaQuery?: string;
+    gramos?: number;
+    kcal?: number;
+    protein?: number;
+    carbs?: number;
+    fat?: number;
+    fiber?: number;
+    sodium?: number;
+    sugar?: number;
+  };
+  const input = toolUse.input as {
+    name?: string;
+    ingredientes?: Ingredient[];
+    confidence?: "alta" | "media" | "baja";
+    notes?: string;
+    score?: number;
+    tip?: string;
+  };
+
+  const ings = Array.isArray(input.ingredientes) ? input.ingredientes : [];
+
+  // Cada ingrediente: USDA (real) si se encuentra; si no, la estimación de respaldo.
+  const computed = await Promise.all(
+    ings.map(async (ing) => {
+      const grams = num(ing.gramos);
+      const hit =
+        grams > 0 && ing.usdaQuery
+          ? await lookupNutrients(ing.usdaQuery, grams)
+          : null;
+      if (hit) {
+        return {
+          item: {
+            nombre: ing.nombre ?? hit.desc,
+            gramos: grams,
+            kcal: hit.nutrients.calories,
+            fuente: "USDA" as const,
+          },
+          n: hit.nutrients,
+        };
+      }
+      const n: Nutrients = {
+        calories: num(ing.kcal),
+        protein: num(ing.protein),
+        carbs: num(ing.carbs),
+        fat: num(ing.fat),
+        fiber: num(ing.fiber),
+        sodium: num(ing.sodium),
+        sugar: num(ing.sugar),
+        iron: 0,
+        potassium: 0,
+        magnesium: 0,
+        zinc: 0,
+        calcium: 0,
+        vitC: 0,
+        vitD: 0,
+        vitB12: 0,
+        omega3: 0,
+      };
+      return {
+        item: {
+          nombre: ing.nombre ?? "Ingrediente",
+          gramos: grams,
+          kcal: n.calories,
+          fuente: "estimado" as const,
+        },
+        n,
+      };
+    }),
+  );
+
+  const sum = (k: keyof Nutrients) =>
+    Math.round(computed.reduce((a, c) => a + (c.n[k] || 0), 0) * 10) / 10;
 
   return {
     name: input.name ?? "Comida",
-    calories: num(input.calories),
-    protein: num(input.protein),
-    carbs: num(input.carbs),
-    fat: num(input.fat),
-    fiber: num(input.fiber),
-    sodium: num(input.sodium),
-    sugar: num(input.sugar),
-    vitamins: Array.isArray(input.vitamins) ? input.vitamins : [],
-    micros: parseMicros(input.micros),
+    calories: sum("calories"),
+    protein: sum("protein"),
+    carbs: sum("carbs"),
+    fat: sum("fat"),
+    fiber: sum("fiber"),
+    sodium: sum("sodium"),
+    sugar: sum("sugar"),
+    vitamins: [],
+    micros: {
+      iron: sum("iron"),
+      potassium: sum("potassium"),
+      magnesium: sum("magnesium"),
+      zinc: sum("zinc"),
+      calcium: sum("calcium"),
+      vitC: sum("vitC"),
+      vitD: sum("vitD"),
+      vitB12: sum("vitB12"),
+      omega3: sum("omega3"),
+    },
     confidence: input.confidence ?? "media",
     notes: input.notes ?? "",
     score: typeof input.score === "number" ? input.score : num(input.score),
     tip: input.tip ?? "",
+    items: computed.map((c) => c.item),
   };
 }
 
 function num(v: unknown): number {
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0;
-}
-
-function parseMicros(v: unknown): MealMicros {
-  const o = (v ?? {}) as Partial<Record<keyof MealMicros, unknown>>;
-  return {
-    iron: num(o.iron),
-    potassium: num(o.potassium),
-    magnesium: num(o.magnesium),
-    zinc: num(o.zinc),
-    calcium: num(o.calcium),
-    vitC: num(o.vitC),
-    vitD: num(o.vitD),
-    vitB12: num(o.vitB12),
-    omega3: num(o.omega3),
-  };
 }
 
 /* ============== NUTRIÓLOGO: evaluación del día ============== */

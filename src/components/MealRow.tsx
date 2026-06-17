@@ -72,6 +72,16 @@ export default function MealRow({
     vitamins = JSON.parse(meal.vitamins);
   } catch {}
 
+  let items: {
+    nombre: string;
+    gramos: number;
+    kcal: number;
+    fuente: "USDA" | "estimado";
+  }[] = [];
+  try {
+    items = JSON.parse(meal.items);
+  } catch {}
+
   async function del() {
     setDeleting(true);
     await fetch(`/api/meals?id=${meal.id}`, { method: "DELETE" });
@@ -177,6 +187,42 @@ export default function MealRow({
                 <span>Azúcar {Math.round(meal.sugar)}g</span>
                 <span>Sodio {Math.round(meal.sodium)}mg</span>
               </div>
+
+              {items.length > 0 && (
+                <div className="mb-3">
+                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                    Desglose
+                  </p>
+                  <div className="space-y-1">
+                    {items.map((it, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-2 text-[12px]"
+                      >
+                        <span className="flex-1 text-[var(--color-text)]">
+                          {it.nombre}
+                          <span className="text-[var(--color-muted)]">
+                            {" "}
+                            · {Math.round(it.gramos)}g
+                          </span>
+                        </span>
+                        <span className="tabular-nums text-[var(--color-muted)]">
+                          {Math.round(it.kcal)} cal
+                        </span>
+                        <span
+                          className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${
+                            it.fuente === "USDA"
+                              ? "bg-[var(--color-fat)]/12 text-[var(--color-fat)]"
+                              : "bg-[var(--color-surface-2)] text-[var(--color-muted)]"
+                          }`}
+                        >
+                          {it.fuente}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {vitamins.length > 0 && (
                 <div className="mb-3 flex flex-wrap gap-1.5">

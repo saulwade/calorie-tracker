@@ -74,6 +74,9 @@ export const meals = sqliteTable("meals", {
   vitD: real("vit_d").notNull().default(0), // mcg
   vitB12: real("vit_b12").notNull().default(0), // mcg
   omega3: real("omega3").notNull().default(0), // g
+
+  // Desglose por ingrediente (JSON): [{nombre, gramos, kcal, fuente}]
+  items: text("items").notNull().default("[]"),
 });
 
 /**
