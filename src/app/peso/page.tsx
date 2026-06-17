@@ -65,7 +65,7 @@ export default function WeightPage() {
         <h1 className="text-2xl font-bold">Peso</h1>
       </header>
 
-      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] card-shadow p-5">
+      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow p-5">
         <div className="flex items-end justify-between">
           <div>
             <div className="text-xs text-[var(--color-muted)]">Actual</div>
@@ -103,12 +103,12 @@ export default function WeightPage() {
         </div>
         {weeks > 0 && (
           <p className="mt-2 text-center text-xs text-[var(--color-muted)]">
-            A este ritmo, ~{weeks} semanas para tu meta 💪
+            A este ritmo, ~{weeks} semanas para tu meta.
           </p>
         )}
       </section>
 
-      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] card-shadow p-3">
+      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow p-3">
         <div className="flex gap-2">
           <input
             type="number"
@@ -139,7 +139,7 @@ export default function WeightPage() {
             return (
               <div
                 key={w.id}
-                className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] card-shadow px-3 py-2"
+                className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow px-3 py-2"
               >
                 <span className="w-20 text-xs capitalize text-[var(--color-muted)]">
                   {relativeDay(w.day, today)}

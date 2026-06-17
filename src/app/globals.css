@@ -1,20 +1,24 @@
 @import "tailwindcss";
 
 @theme {
-  /* Paleta clara estilo "Amy" — minimal, Apple Notes */
-  --color-bg: #f9fafb; /* fondo gris muy claro */
-  --color-surface: #ffffff; /* tarjetas blancas */
-  --color-surface-2: #f3f4f6; /* chips / tracks de barras */
-  --color-border: #e5e7eb; /* bordes suaves */
-  --color-text: #1f2937; /* texto principal (gris 800) */
-  --color-muted: #6b7280; /* texto secundario (gris 500) */
-  --color-accent: #4200ff; /* azul vivo (acento estrella de Amy) */
+  /* Paleta clara y cálida estilo "Amy" / Apple */
+  --color-bg: #faf8f5; /* fondo cálido muy claro */
+  --color-surface: #ffffff; /* tarjetas / píldoras blancas */
+  --color-surface-2: #f3f0ec; /* chips / tracks */
+  --color-border: #ebe7e1; /* bordes suaves cálidos */
+  --color-text: #1c1c1e; /* near-black estilo Apple */
+  --color-muted: #9a958d; /* gris cálido secundario */
+
+  --color-accent: #4200ff; /* azul brand (IA, enviar, links) */
   --color-accent-dim: #3600cc;
-  --color-on-accent: #ffffff; /* texto sobre el acento */
-  --color-protein: #16a34a; /* verde */
-  --color-carbs: #f59e0b; /* ámbar */
-  --color-fat: #ec4899; /* rosa */
-  --color-danger: #dc2626; /* rojo */
+  --color-on-accent: #ffffff;
+
+  /* Macros con los colores de Amy */
+  --color-cal: #f97316; /* calorías — naranja */
+  --color-carbs: #ef4444; /* carbohidratos — rojo */
+  --color-protein: #f59e0b; /* proteína — ámbar */
+  --color-fat: #22c55e; /* grasa — verde */
+  --color-danger: #ff3b30; /* rojo Apple */
 }
 
 :root {
@@ -23,31 +27,60 @@
 
 html,
 body {
-  background: var(--color-bg);
+  /* Fondo con gradiente cálido muy sutil (como Amy) */
+  background:
+    radial-gradient(
+      120% 80% at 50% 0%,
+      #fdfbf7 0%,
+      #faf7f4 45%,
+      #f7f4f8 100%
+    )
+    fixed;
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* Sombra suave para tarjetas (look limpio sobre fondo claro) */
-.card-shadow {
+/* Fuente: SF Pro en dispositivos Apple, Inter como respaldo. */
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", var(--font-inter),
+    system-ui, sans-serif;
+  letter-spacing: -0.011em;
+}
+
+/* Sombra suave y elevada para píldoras/tarjetas flotantes */
+.soft-shadow {
   box-shadow:
-    0 1px 2px rgba(17, 24, 39, 0.04),
-    0 4px 16px rgba(17, 24, 39, 0.04);
+    0 1px 2px rgba(28, 28, 30, 0.04),
+    0 8px 24px rgba(28, 28, 30, 0.06);
 }
 
-/* Scrollbar discreto */
 ::-webkit-scrollbar {
   width: 8px;
-  height: 8px;
 }
 ::-webkit-scrollbar-thumb {
   background: var(--color-border);
   border-radius: 8px;
 }
 
-/* Quita spinners feos de inputs number */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
+}
+
+@keyframes shimmer {
+  0% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.4;
+  }
+}
+.shimmer {
+  animation: shimmer 1.4s ease-in-out infinite;
 }

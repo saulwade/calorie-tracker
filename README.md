@@ -57,7 +57,7 @@ Tracker personal de calorías y macros. Registra lo que comes con **foto, texto 
 2. Entra a https://vercel.com, importa el repo.
 3. En **Environment Variables** de Vercel agrega:
    - `ANTHROPIC_API_KEY` = tu llave de Claude
-   - `ANTHROPIC_MODEL` = `claude-opus-4-6` (o `claude-sonnet-4-6` para gastar menos)
+   - `ANTHROPIC_MODEL` = `claude-sonnet-4-6` (barato y preciso; o `claude-opus-4-6` para máxima precisión)
    - `TURSO_DATABASE_URL` = la URL de Turso (libsql://...)
    - `TURSO_AUTH_TOKEN` = el token de Turso
    - `APP_PASSWORD` = tu contraseña

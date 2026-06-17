@@ -1,12 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import type { Meal, Profile } from "@/db/schema";
 import { localDay, prettyDay } from "@/lib/dates";
-import AddFood from "@/components/AddFood";
-import MealCard from "@/components/MealCard";
+import Composer, { type ComposerPayload } from "@/components/Composer";
+import MealRow from "@/components/MealRow";
 import Nav from "@/components/Nav";
-import { CalorieRing, MacroBar, MicroStat } from "@/components/Stats";
+import TotalsBar, { type Totals } from "@/components/TotalsBar";
+import { GearIcon } from "@/components/icons";
+
+type Pending = {
+  tempId: number;
+  label: string;
+  status: "thinking" | "error";
+  error?: string;
+};
+
+let tempCounter = 1;
 
 function sum(meals: Meal[], key: keyof Meal): number {
   return meals.reduce((acc, m) => acc + (Number(m[key]) || 0), 0);
@@ -15,7 +26,9 @@ function sum(meals: Meal[], key: keyof Meal): number {
 export default function TodayPage() {
   const [meals, setMeals] = useState<Meal[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [pending, setPending] = useState<Pending[]>([]);
   const [loading, setLoading] = useState(true);
+  const [goalsOpen, setGoalsOpen] = useState(false);
   const today = localDay();
 
   const load = useCallback(async () => {
@@ -23,10 +36,8 @@ export default function TodayPage() {
       fetch(`/api/meals?day=${today}`),
       fetch(`/api/profile`),
     ]);
-    const mData = await mRes.json();
-    const pData = await pRes.json();
-    setMeals(mData.meals ?? []);
-    setProfile(pData.profile ?? null);
+    setMeals((await mRes.json()).meals ?? []);
+    setProfile((await pRes.json()).profile ?? null);
     setLoading(false);
   }, [today]);
 
@@ -34,99 +45,123 @@ export default function TodayPage() {
     load();
   }, [load]);
 
-  if (loading || !profile) {
-    return (
-      <div className="grid min-h-screen place-items-center text-[var(--color-muted)]">
-        Cargando…
-      </div>
-    );
+  async function handleSubmit(p: ComposerPayload) {
+    const tempId = tempCounter++;
+    const label = p.text || "Analizando foto…";
+    setPending((prev) => [{ tempId, label, status: "thinking" }, ...prev]);
+
+    try {
+      const res = await fetch("/api/meals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...p, day: today }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Error");
+      setPending((prev) => prev.filter((x) => x.tempId !== tempId));
+      await load();
+    } catch (err) {
+      setPending((prev) =>
+        prev.map((x) =>
+          x.tempId === tempId
+            ? {
+                ...x,
+                status: "error",
+                error: err instanceof Error ? err.message : "Error",
+              }
+            : x,
+        ),
+      );
+    }
   }
 
-  const totals = {
+  const totals: Totals = {
     calories: sum(meals, "calories"),
     protein: sum(meals, "protein"),
     carbs: sum(meals, "carbs"),
     fat: sum(meals, "fat"),
     fiber: sum(meals, "fiber"),
-    sodium: sum(meals, "sodium"),
     sugar: sum(meals, "sugar"),
+    sodium: sum(meals, "sodium"),
   };
 
   return (
-    <main className="mx-auto max-w-md px-4 pb-28 pt-6">
-      <header className="mb-4">
-        <p className="text-sm capitalize text-[var(--color-muted)]">
-          {prettyDay(today)}
-        </p>
-        <h1 className="text-2xl font-bold">Hoy</h1>
+    <main className="min-h-screen">
+      {/* Header */}
+      <header className="mx-auto flex max-w-md items-center justify-between px-5 pt-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Hoy</h1>
+          <p className="text-[13px] capitalize text-[var(--color-muted)]">
+            {prettyDay(today)}
+          </p>
+        </div>
+        <Link
+          href="/ajustes"
+          className="grid h-10 w-10 place-items-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] soft-shadow"
+          aria-label="Ajustes"
+        >
+          <GearIcon size={20} />
+        </Link>
       </header>
 
-      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] card-shadow p-5">
-        <div className="mb-5 flex justify-center">
-          <CalorieRing
-            consumed={totals.calories}
-            target={profile.targetCalories}
-          />
-        </div>
-        <div className="space-y-3">
-          <MacroBar
-            label="Proteína"
-            consumed={totals.protein}
-            target={profile.targetProtein}
-            color="var(--color-protein)"
-          />
-          <MacroBar
-            label="Carbohidratos"
-            consumed={totals.carbs}
-            target={profile.targetCarbs}
-            color="var(--color-carbs)"
-          />
-          <MacroBar
-            label="Grasas"
-            consumed={totals.fat}
-            target={profile.targetFat}
-            color="var(--color-fat)"
-          />
-        </div>
-      </section>
+      {/* Lista de comidas */}
+      <section className="mx-auto max-w-md px-5 pb-[210px] pt-4">
+        {pending.map((p) => (
+          <div
+            key={p.tempId}
+            className="flex items-start gap-4 border-b border-[var(--color-border)]/70 py-3.5"
+          >
+            <span className="flex-1 text-[15px] leading-snug text-[var(--color-text)]">
+              {p.label}
+            </span>
+            {p.status === "thinking" ? (
+              <span className="shimmer mt-0.5 shrink-0 text-[14px] text-[var(--color-muted)]">
+                Pensando…
+              </span>
+            ) : (
+              <button
+                onClick={() =>
+                  setPending((prev) => prev.filter((x) => x.tempId !== p.tempId))
+                }
+                className="mt-0.5 shrink-0 text-[13px] text-[var(--color-danger)]"
+                title={p.error}
+              >
+                Error · descartar
+              </button>
+            )}
+          </div>
+        ))}
 
-      <section className="mb-4 grid grid-cols-3 gap-2">
-        <MicroStat
-          label="Fibra"
-          consumed={totals.fiber}
-          target={profile.targetFiber}
-          unit="g"
-        />
-        <MicroStat
-          label="Azúcar"
-          consumed={totals.sugar}
-          target={profile.targetSugar}
-          unit="g"
-          goodLow
-        />
-        <MicroStat
-          label="Sodio"
-          consumed={totals.sodium}
-          target={profile.targetSodium}
-          unit="mg"
-          goodLow
-        />
-      </section>
+        {!loading && meals.length === 0 && pending.length === 0 && (
+          <div className="pt-20 text-center">
+            <p className="text-[15px] text-[var(--color-muted)]">
+              Aún no registras nada hoy.
+            </p>
+            <p className="mt-1 text-[13px] text-[var(--color-muted)]">
+              Escribe o toma una foto de lo que comes.
+            </p>
+          </div>
+        )}
 
-      <section className="mb-4">
-        <AddFood onAdded={load} />
-      </section>
-
-      <section className="space-y-2">
-        <h2 className="px-1 text-sm font-medium text-[var(--color-muted)]">
-          {meals.length === 0
-            ? "Aún no registras nada hoy"
-            : `Comidas de hoy (${meals.length})`}
-        </h2>
         {meals.map((meal) => (
-          <MealCard key={meal.id} meal={meal} onDeleted={load} />
+          <MealRow key={meal.id} meal={meal} onDeleted={load} />
         ))}
       </section>
+
+      {/* Barra inferior: totales (con metas desplegables) + composer */}
+      <div className="fixed inset-x-0 bottom-0 z-20 pb-[72px]">
+        <div className="space-y-2 pt-2">
+          {profile && (
+            <TotalsBar
+              totals={totals}
+              profile={profile}
+              open={goalsOpen}
+              onToggle={() => setGoalsOpen((o) => !o)}
+            />
+          )}
+          <Composer onSubmit={handleSubmit} />
+        </div>
+      </div>
 
       <Nav />
     </main>

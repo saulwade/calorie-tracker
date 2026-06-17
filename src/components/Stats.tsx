@@ -11,8 +11,8 @@ export function CalorieRing({
   const over = consumed > target;
   const remaining = Math.round(target - consumed);
 
-  const size = 180;
-  const stroke = 14;
+  const size = 150;
+  const stroke = 12;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const offset = c * (1 - pct);
@@ -33,7 +33,7 @@ export function CalorieRing({
           cy={size / 2}
           r={r}
           fill="none"
-          stroke={over ? "var(--color-danger)" : "var(--color-accent)"}
+          stroke={over ? "var(--color-danger)" : "var(--color-cal)"}
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={c}
@@ -42,18 +42,18 @@ export function CalorieRing({
         />
       </svg>
       <div className="absolute flex flex-col items-center">
-        <span className="text-4xl font-bold tabular-nums">
+        <span className="text-3xl font-semibold tabular-nums">
           {Math.round(consumed)}
         </span>
         <span className="text-xs text-[var(--color-muted)]">
-          de {target} kcal
+          de {target} cal
         </span>
         <span
-          className={`mt-1 text-sm font-medium ${
-            over ? "text-[var(--color-danger)]" : "text-[var(--color-accent)]"
+          className={`mt-0.5 text-[13px] font-medium ${
+            over ? "text-[var(--color-danger)]" : "text-[var(--color-cal)]"
           }`}
         >
-          {over ? `+${Math.abs(remaining)} pasado` : `${remaining} restantes`}
+          {over ? `+${Math.abs(remaining)}` : `${remaining} restantes`}
         </span>
       </div>
     </div>
@@ -77,62 +77,23 @@ export function MacroBar({
   const over = consumed > target * 1.05;
   return (
     <div>
-      <div className="mb-1 flex items-baseline justify-between text-sm">
-        <span className="font-medium" style={{ color }}>
+      <div className="mb-1.5 flex items-baseline justify-between text-[13px]">
+        <span className="flex items-center gap-1.5 font-medium text-[var(--color-text)]">
+          <span className="h-2 w-2 rounded-full" style={{ background: color }} />
           {label}
         </span>
         <span className="tabular-nums text-[var(--color-muted)]">
-          {Math.round(consumed)}
-          <span className="opacity-60">
-            /{target}
-            {unit}
-          </span>
-        </span>
-      </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--color-surface-2)]">
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{
-            width: `${pct}%`,
-            background: over ? "var(--color-danger)" : color,
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
-export function MicroStat({
-  label,
-  consumed,
-  target,
-  unit,
-  goodLow = false,
-}: {
-  label: string;
-  consumed: number;
-  target: number;
-  unit: string;
-  goodLow?: boolean;
-}) {
-  // goodLow = quieres quedar POR DEBAJO (sodio, azúcar). Verde si bajo, rojo si pasado.
-  const over = consumed > target;
-  const color = goodLow
-    ? over
-      ? "var(--color-danger)"
-      : "var(--color-accent)"
-    : "var(--color-text)";
-  return (
-    <div className="rounded-xl bg-[var(--color-surface-2)] p-3 text-center">
-      <div className="text-[11px] uppercase tracking-wide text-[var(--color-muted)]">
-        {label}
-      </div>
-      <div className="mt-1 tabular-nums" style={{ color }}>
-        <span className="text-lg font-semibold">{Math.round(consumed)}</span>
-        <span className="text-xs text-[var(--color-muted)]">
-          /{target}
+          <span className="text-[var(--color-text)]">{Math.round(consumed)}</span>
+          {" / "}
+          {target}
           {unit}
         </span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-surface-2)]">
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, background: over ? "var(--color-danger)" : color }}
+        />
       </div>
     </div>
   );

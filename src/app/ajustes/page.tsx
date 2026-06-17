@@ -75,7 +75,7 @@ export default function SettingsPage() {
         </p>
       </header>
 
-      <section className="mb-4 space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] card-shadow p-4">
+      <section className="mb-4 space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow p-4">
         <Field label="Sexo">
           <div className="flex gap-2">
             {(["male", "female"] as const).map((s) => (
@@ -158,7 +158,7 @@ export default function SettingsPage() {
         </Field>
       </section>
 
-      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] card-shadow p-4">
+      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow p-4">
         <h2 className="mb-3 text-sm font-medium text-[var(--color-muted)]">
           Metas diarias calculadas
         </h2>

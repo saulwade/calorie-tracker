@@ -2,36 +2,33 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { HomeIcon, ChartIcon, ScaleIcon, GearIcon } from "./icons";
 
 const ITEMS = [
-  { href: "/", label: "Hoy", icon: "🍽️" },
-  { href: "/historial", label: "Historial", icon: "📊" },
-  { href: "/peso", label: "Peso", icon: "⚖️" },
-  { href: "/ajustes", label: "Ajustes", icon: "⚙️" },
+  { href: "/", label: "Hoy", Icon: HomeIcon },
+  { href: "/historial", label: "Historial", Icon: ChartIcon },
+  { href: "/peso", label: "Peso", Icon: ScaleIcon },
+  { href: "/ajustes", label: "Ajustes", Icon: GearIcon },
 ];
 
 export default function Nav() {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-[var(--color-border)] bg-[var(--color-surface)]/95 backdrop-blur">
+    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--color-border)] bg-[var(--color-surface)]/85 backdrop-blur-xl">
       <div className="mx-auto flex max-w-md items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)]">
-        {ITEMS.map((item) => {
+        {ITEMS.map(({ href, label, Icon }) => {
           const active =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
+            href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <Link
-              key={item.href}
-              href={item.href}
-              className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] transition ${
-                active
-                  ? "text-[var(--color-accent)]"
-                  : "text-[var(--color-muted)]"
+              key={href}
+              href={href}
+              className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition ${
+                active ? "text-[var(--color-accent)]" : "text-[var(--color-muted)]"
               }`}
             >
-              <span className="text-xl">{item.icon}</span>
-              {item.label}
+              <Icon size={22} />
+              {label}
             </Link>
           );
         })}

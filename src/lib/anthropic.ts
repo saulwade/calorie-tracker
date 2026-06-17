@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-6";
+// Sonnet por defecto: suficiente para estimar nutrición y mucho más barato que Opus.
+const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 
 export interface FoodAnalysis {
   name: string;
@@ -28,7 +29,7 @@ const FOOD_TOOL: Anthropic.Tool = {
       name: {
         type: "string",
         description:
-          "Descripción corta de la comida en español, incluyendo porción estimada. Ej: 'Plato de 2 tacos al pastor con piña'",
+          "Descripción corta de la comida en español, incluyendo porción estimada. Ej: 'Bowl de pollo de Chipotle (2/3 lleno)'",
       },
       calories: { type: "number", description: "Calorías totales (kcal)" },
       protein: { type: "number", description: "Proteína total (gramos)" },
@@ -59,12 +60,12 @@ const FOOD_TOOL: Anthropic.Tool = {
         type: "string",
         enum: ["alta", "media", "baja"],
         description:
-          "Qué tan seguro estás de la estimación. 'baja' si la foto es ambigua o falta info de porción.",
+          "Qué tan seguro estás. 'alta' si tienes foto + descripción clara; 'baja' si falta info de porción o ingredientes.",
       },
       notes: {
         type: "string",
         description:
-          "Suposiciones que hiciste (porción, ingredientes asumidos) o nota breve. En español, máx 1 frase.",
+          "En 1-2 frases: en qué te basaste para el cálculo y qué asumiste (porción, ingredientes, preparación). Como un breve razonamiento. En español.",
       },
     },
     required: [
@@ -83,14 +84,16 @@ const FOOD_TOOL: Anthropic.Tool = {
   },
 };
 
-const SYSTEM = `Eres un nutriólogo experto que estima el contenido nutricional de comidas.
-Reglas:
-- Estima porciones realistas. Si ves una foto, calcula tamaño de porción por referencias visuales (plato, cubiertos, manos).
-- Si el usuario da cantidades ("200g de pollo", "2 tacos"), respétalas.
-- Para comida mexicana/latina usa valores realistas (tortillas, salsas, aceite de cocina, etc.).
-- Si falta información, asume una porción típica y dilo en 'notes', y baja la 'confidence'.
-- Siempre responde llamando a la herramienta 'registrar_comida'. No escribas texto adicional.
-- Todo en español.`;
+const SYSTEM = `Eres un asistente de nutrición experto y meticuloso. Estimas el contenido nutricional de lo que come el usuario de la forma MÁS PRECISA posible.
+
+Cómo trabajar:
+- Cuando haya FOTO y DESCRIPCIÓN juntas, ÚSALAS COMBINADAS: la foto te da la porción y el contexto visual; el texto te da lo que la foto no muestra (ingredientes, marca, preparación, cantidades exactas). Cruza ambas fuentes.
+- Si la foto no alcanza a mostrar algo, complétalo con el texto; si el texto es vago, apóyate en la foto.
+- Estima la porción usando referencias visuales (plato, cubiertos, mano, envase) o las cantidades que diga el usuario.
+- Usa valores nutricionales realistas de alimentos y marcas comunes (incluye comida mexicana/latina: tortillas, salsas, aceite de cocina, etc.).
+- Si hay incertidumbre, elige una porción típica, decláralo en 'notes' y baja la 'confidence'. No inventes precisión falsa.
+- En 'notes' deja un breve razonamiento (1-2 frases) de en qué te basaste.
+- Responde SIEMPRE llamando a la herramienta 'registrar_comida', sin texto extra. Todo en español.`;
 
 type AnalyzeArgs = {
   text?: string;
@@ -120,15 +123,18 @@ export async function analyzeFood({
     });
   }
 
-  content.push({
-    type: "text",
-    text:
-      (imageBase64
-        ? "Analiza esta foto de comida. "
-        : "Analiza esta comida. ") +
-      (text ? `Contexto del usuario: "${text}"` : "") +
-      "\nEstima el desglose nutricional y regístralo con la herramienta.",
-  });
+  const hasImage = Boolean(imageBase64);
+  let instruction: string;
+  if (hasImage && text) {
+    instruction = `El usuario subió esta foto Y la describió así: "${text}". Combina la foto y la descripción para estimar el desglose nutricional lo más preciso posible.`;
+  } else if (hasImage) {
+    instruction =
+      "Analiza esta foto de comida y estima su desglose nutricional.";
+  } else {
+    instruction = `Estima el desglose nutricional de: "${text}".`;
+  }
+
+  content.push({ type: "text", text: instruction });
 
   const message = await client.messages.create({
     model: MODEL,

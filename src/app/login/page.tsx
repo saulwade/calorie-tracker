@@ -32,9 +32,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center p-6">
       <form
         onSubmit={submit}
-        className="w-full max-w-sm rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] card-shadow p-6"
+        className="w-full max-w-sm rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow p-6"
       >
-        <div className="mb-1 text-3xl">🥗</div>
+        <div className="mb-3 h-9 w-9 rounded-xl bg-[var(--color-accent)]" />
         <h1 className="mb-1 text-xl font-semibold">Mis Calorías</h1>
         <p className="mb-5 text-sm text-[var(--color-muted)]">
           Tu tracker personal. Ingresa tu contraseña.
