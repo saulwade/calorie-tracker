@@ -5,6 +5,7 @@ import { FlameIcon, CloseIcon } from "./icons";
 import { CalorieRing, MacroBar } from "./Stats";
 import Coach from "./Coach";
 import { MICRO_TARGETS, MICRO_ORDER, type MicroKey } from "@/lib/nutrition";
+import { toHands, proteinPerMeal } from "@/lib/portions";
 
 export type Totals = {
   calories: number;
@@ -115,6 +116,8 @@ export default function TotalsBar({
               {naKHint}
             </p>
           )}
+
+          <PortionGuide profile={profile} />
 
           <MicroGrid totals={totals} />
 
@@ -237,6 +240,51 @@ function MicroGrid({ totals }: { totals: Totals }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** Tus metas traducidas a porciones de mano (sin pesar). */
+function PortionGuide({ profile }: { profile: Profile }) {
+  const hands = toHands({
+    protein: profile.targetProtein,
+    carbs: profile.targetCarbs,
+    fat: profile.targetFat,
+  });
+  const perMeal = proteinPerMeal(profile.targetProtein, 4);
+
+  const rows = [
+    { label: "Proteína", n: hands.palmas, unit: "palmas", color: "var(--color-protein)" },
+    { label: "Carbohidrato", n: hands.manos, unit: "manos", color: "var(--color-carbs)" },
+    { label: "Grasa", n: hands.pulgares, unit: "pulgares", color: "var(--color-cal)" },
+    { label: "Verdura", n: 2, unit: "+ puños", color: "var(--color-fat)" },
+  ];
+
+  return (
+    <div className="mt-4 border-t border-[var(--color-border)] pt-3">
+      <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-[var(--color-muted)]">
+        Tus porciones del día (sin pesar)
+      </p>
+      <div className="space-y-1.5">
+        {rows.map((r) => (
+          <div key={r.label} className="flex items-center gap-2 text-[13px]">
+            <span className="h-2 w-2 rounded-full" style={{ background: r.color }} />
+            <span className="font-semibold tabular-nums text-[var(--color-text)]">
+              {r.n} {r.unit}
+            </span>
+            <span className="text-[var(--color-muted)]">de {r.label.toLowerCase()}</span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-[12px] leading-snug text-[var(--color-muted)]">
+        1 palma ≈ 2 huevos o 1 pechuga · 1 mano ≈ 1 taza de arroz/avena · 1 pulgar
+        ≈ 1 cda de aceite o ¼ de aguacate.
+      </p>
+      <p className="mt-1.5 text-[12px] leading-snug text-[var(--color-text)]">
+        Apunta a <span className="font-semibold">~{perMeal} g de proteína por comida</span>{" "}
+        (≈ 3-4 huevos o 1 palma) en 3-4 comidas, dentro de una ventana de ~10 h y
+        deja 3 h antes de dormir.
+      </p>
     </div>
   );
 }
