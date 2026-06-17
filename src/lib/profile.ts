@@ -51,14 +51,18 @@ type ProfileUpdate = {
 export async function updateProfile(update: ProfileUpdate): Promise<Profile> {
   const current = await getOrCreateProfile();
 
+  // Clamps de seguridad para no corromper los cálculos con valores absurdos.
+  const clamp = (v: number, lo: number, hi: number) =>
+    Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : lo;
+
   const merged = {
-    sex: update.sex ?? current.sex,
-    age: update.age ?? current.age,
-    heightCm: update.heightCm ?? current.heightCm,
-    startWeightKg: update.startWeightKg ?? current.startWeightKg,
-    goalWeightKg: update.goalWeightKg ?? current.goalWeightKg,
+    sex: update.sex === "female" ? "female" : update.sex === "male" ? "male" : current.sex,
+    age: clamp(update.age ?? current.age, 10, 120),
+    heightCm: clamp(update.heightCm ?? current.heightCm, 100, 250),
+    startWeightKg: clamp(update.startWeightKg ?? current.startWeightKg, 20, 400),
+    goalWeightKg: clamp(update.goalWeightKg ?? current.goalWeightKg, 20, 400),
     activity: (update.activity ?? current.activity) as ActivityLevel,
-    deficit: update.deficit ?? current.deficit,
+    deficit: clamp(update.deficit ?? current.deficit, 0, 1500),
   };
 
   // El plan se ajusta a tu peso MÁS RECIENTE (si ya registraste alguno),

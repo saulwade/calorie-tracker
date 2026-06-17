@@ -3,6 +3,9 @@ import { db, schema } from "@/db";
 import { eq, desc } from "drizzle-orm";
 import { analyzeFood } from "@/lib/anthropic";
 import { getOrCreateProfile } from "@/lib/profile";
+import { allow, tooMany } from "@/lib/ratelimit";
+
+const ALLOWED_MEDIA = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -111,6 +114,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Protección de costo: tope de llamadas a la IA.
+    if (!allow("ai")) return tooMany();
+
+    // Validar imágenes (cantidad, tipo, tamaño) antes de mandarlas a la IA.
+    if (imgs.length > 4) {
+      return NextResponse.json({ error: "Máximo 4 fotos." }, { status: 400 });
+    }
+    for (const im of imgs) {
+      if (!ALLOWED_MEDIA.includes(im.mediaType)) {
+        return NextResponse.json(
+          { error: "Formato de imagen no soportado." },
+          { status: 400 },
+        );
+      }
+      if (typeof im.base64 !== "string" || im.base64.length > 8_000_000) {
+        return NextResponse.json(
+          { error: "Imagen demasiado grande." },
+          { status: 400 },
+        );
+      }
+    }
+
     const profile = await getOrCreateProfile();
     const goalContext = goalContextFrom(profile);
 
@@ -143,7 +168,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ meal: inserted[0] });
   } catch (err) {
-    console.error("Error analizando comida:", err);
+    console.error("Error analizando comida:", err instanceof Error ? err.message : err);
     const msg =
       err instanceof Error ? err.message : "Error al analizar la comida.";
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -192,6 +217,7 @@ export async function PATCH(req: NextRequest) {
 
     // --- Ajuste por chat (recalcula con IA) ---
     if (body.correction) {
+      if (!allow("ai")) return tooMany();
       const profile = await getOrCreateProfile();
       const analysis = await analyzeFood({
         text: `Comida ya registrada: "${meal.name}" (actualmente ${Math.round(meal.calories)} kcal, P${Math.round(meal.protein)} C${Math.round(meal.carbs)} G${Math.round(meal.fat)}). El usuario pide este ajuste: "${body.correction}". Recalcula la comida COMPLETA aplicando ese ajuste.`,
@@ -223,7 +249,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ error: "nada que editar" }, { status: 400 });
   } catch (err) {
-    console.error("Error editando comida:", err);
+    console.error("Error editando comida:", err instanceof Error ? err.message : err);
     const msg = err instanceof Error ? err.message : "Error al editar.";
     return NextResponse.json({ error: msg }, { status: 500 });
   }

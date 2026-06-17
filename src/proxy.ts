@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { sha256Hex } from "@/lib/auth";
 
 // Rutas que NO requieren contraseña.
 const PUBLIC = [
@@ -11,28 +12,38 @@ const PUBLIC = [
   "/apple-touch-icon.png",
 ];
 
-export function proxy(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Permite estáticos y rutas públicas.
   if (
     PUBLIC.some((p) => pathname.startsWith(p)) ||
     pathname.startsWith("/_next") ||
-    pathname === "/favicon.ico" ||
-    pathname === "/manifest.webmanifest"
+    pathname === "/favicon.ico"
   ) {
     return NextResponse.next();
   }
 
   const expected = process.env.APP_PASSWORD;
+
+  // Sin contraseña configurada:
+  // - en producción: FAIL-CLOSED (nunca dejar la app abierta por accidente).
+  // - en desarrollo: modo abierto (cómodo en local).
+  if (!expected || expected === "cambiame") {
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        { error: "App sin contraseña configurada (APP_PASSWORD)." },
+        { status: 503 },
+      );
+    }
+    return NextResponse.next();
+  }
+
   const cookie = req.cookies.get("pct_auth")?.value;
+  const expectedHash = await sha256Hex(expected);
+  if (cookie === expectedHash) return NextResponse.next();
 
-  // Si no hay contraseña configurada, no bloqueamos (modo abierto).
-  if (!expected) return NextResponse.next();
-
-  if (cookie === expected) return NextResponse.next();
-
-  // No autenticado: a /login (o 401 si es una llamada al API).
+  // No autenticado: 401 al API, redirige a /login en páginas.
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "no autorizado" }, { status: 401 });
   }

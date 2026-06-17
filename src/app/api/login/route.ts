@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { sha256Hex } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -20,7 +21,8 @@ export async function POST(req: NextRequest) {
   }
 
   const res = NextResponse.json({ ok: true });
-  res.cookies.set("pct_auth", expected, {
+  // Guardamos el HASH de la contraseña, no la contraseña en texto.
+  res.cookies.set("pct_auth", await sha256Hex(expected), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

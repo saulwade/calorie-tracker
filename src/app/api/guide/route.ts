@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { desc } from "drizzle-orm";
 import { generateGuide } from "@/lib/anthropic";
 import { getOrCreateProfile } from "@/lib/profile";
+import { allow, tooMany } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -10,6 +11,7 @@ export const maxDuration = 60;
 /** POST /api/guide  body: { foods?: string } — guía personalizada para comer limpio. */
 export async function POST(req: NextRequest) {
   try {
+    if (!allow("ai")) return tooMany();
     const body = await req.json().catch(() => ({}));
     const foods: string | undefined = body.foods;
 
@@ -35,7 +37,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ guide });
   } catch (err) {
-    console.error("Error en guide:", err);
+    console.error("Error en guide:", err instanceof Error ? err.message : err);
     const msg = err instanceof Error ? err.message : "Error al generar la guía.";
     return NextResponse.json({ error: msg }, { status: 500 });
   }

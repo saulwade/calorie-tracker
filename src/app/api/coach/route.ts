@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
 import { coachDay } from "@/lib/anthropic";
 import { getOrCreateProfile } from "@/lib/profile";
+import { allow, tooMany } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -10,6 +11,7 @@ export const maxDuration = 60;
 /** GET /api/coach?day=YYYY-MM-DD — evaluación del día por el "nutriólogo". */
 export async function GET(req: NextRequest) {
   try {
+    if (!allow("ai")) return tooMany();
     const day = req.nextUrl.searchParams.get("day");
     if (!day) return NextResponse.json({ error: "falta day" }, { status: 400 });
 
@@ -41,7 +43,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ coaching });
   } catch (err) {
-    console.error("Error en coach:", err);
+    console.error("Error en coach:", err instanceof Error ? err.message : err);
     const msg = err instanceof Error ? err.message : "Error al evaluar el día.";
     return NextResponse.json({ error: msg }, { status: 500 });
   }

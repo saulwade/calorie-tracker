@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { sql, desc, gte } from "drizzle-orm";
 import { coachWeek } from "@/lib/anthropic";
 import { getOrCreateProfile } from "@/lib/profile";
+import { allow, tooMany } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,6 +18,7 @@ function localDayServer(d: Date): string {
 /** GET /api/coach/week — evaluación de los últimos 7 días por el nutriólogo. */
 export async function GET() {
   try {
+    if (!allow("ai")) return tooMany();
     const today = new Date();
     const from = new Date(today);
     from.setDate(from.getDate() - 6);
@@ -70,7 +72,7 @@ export async function GET() {
 
     return NextResponse.json({ coaching });
   } catch (err) {
-    console.error("Error en coach/week:", err);
+    console.error("Error en coach/week:", err instanceof Error ? err.message : err);
     const msg =
       err instanceof Error ? err.message : "Error al evaluar la semana.";
     return NextResponse.json({ error: msg }, { status: 500 });
