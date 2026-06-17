@@ -1,7 +1,17 @@
 import { db, schema } from "@/db";
 import { type Profile } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { calcTargets, type ActivityLevel } from "./nutrition";
+
+/** Peso más reciente registrado (para ajustar el plan automáticamente). */
+async function getLatestWeight(): Promise<number | null> {
+  const rows = await db
+    .select()
+    .from(schema.weights)
+    .orderBy(desc(schema.weights.day))
+    .limit(1);
+  return rows[0]?.weightKg ?? null;
+}
 
 /** Obtiene el perfil (id=1). Si no existe, lo crea con valores por defecto. */
 export async function getOrCreateProfile(): Promise<Profile> {
@@ -51,11 +61,15 @@ export async function updateProfile(update: ProfileUpdate): Promise<Profile> {
     deficit: update.deficit ?? current.deficit,
   };
 
+  // El plan se ajusta a tu peso MÁS RECIENTE (si ya registraste alguno),
+  // así las metas bajan contigo conforme adelgazas. Si no hay registro, usa el inicial.
+  const currentWeight = (await getLatestWeight()) ?? merged.startWeightKg;
+
   const t = calcTargets({
     sex: merged.sex,
     age: merged.age,
     heightCm: merged.heightCm,
-    weightKg: merged.startWeightKg,
+    weightKg: currentWeight,
     goalWeightKg: merged.goalWeightKg,
     activity: merged.activity,
     deficit: merged.deficit,

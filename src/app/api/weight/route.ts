@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { desc } from "drizzle-orm";
+import { updateProfile } from "@/lib/profile";
 
 export const runtime = "nodejs";
 
@@ -29,9 +30,12 @@ export async function POST(req: NextRequest) {
       set: { weightKg, loggedAt: Date.now() },
     });
 
+  // Recalcula el plan con el peso nuevo (ajuste automático).
+  const profile = await updateProfile({});
+
   const rows = await db
     .select()
     .from(schema.weights)
     .orderBy(desc(schema.weights.day));
-  return NextResponse.json({ weights: rows });
+  return NextResponse.json({ weights: rows, profile });
 }

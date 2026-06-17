@@ -55,6 +55,8 @@ export default function TotalsBar({
               color="var(--color-fat)"
             />
           </div>
+          <MacroSplit profile={profile} />
+
           <div className="mt-4 flex justify-between border-t border-[var(--color-border)] pt-3 text-[12px] text-[var(--color-muted)]">
             <span>
               Fibra{" "}
@@ -98,6 +100,57 @@ export default function TotalsBar({
         <Dot />
         <Stat letter="F" color="var(--color-fat)" value={totals.fat} />
       </button>
+    </div>
+  );
+}
+
+/** Distribución de macros del plan: barra apilada + gramos y % de las calorías. */
+function MacroSplit({ profile }: { profile: Profile }) {
+  const pKcal = profile.targetProtein * 4;
+  const cKcal = profile.targetCarbs * 4;
+  const fKcal = profile.targetFat * 9;
+  const total = pKcal + cKcal + fKcal || 1;
+  const pPct = Math.round((pKcal / total) * 100);
+  const cPct = Math.round((cKcal / total) * 100);
+  const fPct = 100 - pPct - cPct;
+
+  const items = [
+    { label: "Proteína", g: profile.targetProtein, pct: pPct, color: "var(--color-protein)" },
+    { label: "Carbos", g: profile.targetCarbs, pct: cPct, color: "var(--color-carbs)" },
+    { label: "Grasa", g: profile.targetFat, pct: fPct, color: "var(--color-fat)" },
+  ];
+
+  return (
+    <div className="mt-4 border-t border-[var(--color-border)] pt-3">
+      <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-[var(--color-muted)]">
+        Distribución del plan
+      </p>
+      <div className="mb-2.5 flex h-2.5 w-full overflow-hidden rounded-full">
+        {items.map((it) => (
+          <div key={it.label} style={{ width: `${it.pct}%`, background: it.color }} />
+        ))}
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {items.map((it) => (
+          <div key={it.label} className="text-center">
+            <div className="flex items-center justify-center gap-1.5">
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ background: it.color }}
+              />
+              <span className="text-[12px] text-[var(--color-muted)]">
+                {it.label}
+              </span>
+            </div>
+            <div className="mt-0.5 text-[13px] font-semibold tabular-nums text-[var(--color-text)]">
+              {it.g}g
+            </div>
+            <div className="text-[11px] tabular-nums text-[var(--color-muted)]">
+              {it.pct}%
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

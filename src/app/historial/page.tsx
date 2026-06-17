@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import type { Profile } from "@/db/schema";
 import { localDay, relativeDay } from "@/lib/dates";
 import Nav from "@/components/Nav";
+import LineChart from "@/components/LineChart";
+
+function shortDate(day: string) {
+  const [, m, d] = day.split("-");
+  return `${Number(d)}/${Number(m)}`;
+}
 
 type DayRow = {
   day: string;
@@ -54,6 +60,25 @@ export default function HistoryPage() {
           </p>
         )}
       </header>
+
+      {days.length > 1 && (
+        <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow p-4">
+          <h2 className="mb-2 text-sm font-medium text-[var(--color-muted)]">
+            Calorías por día
+          </h2>
+          <LineChart
+            points={[...days]
+              .reverse()
+              .map((d) => ({
+                label: shortDate(d.day),
+                value: Math.round(d.calories),
+              }))}
+            color="var(--color-cal)"
+            goal={target}
+            height={150}
+          />
+        </section>
+      )}
 
       {loading ? (
         <p className="text-[var(--color-muted)]">Cargando…</p>

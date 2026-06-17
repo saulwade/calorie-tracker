@@ -5,6 +5,12 @@ import type { Profile, Weight } from "@/db/schema";
 import { localDay, relativeDay } from "@/lib/dates";
 import { weeksToGoal } from "@/lib/nutrition";
 import Nav from "@/components/Nav";
+import LineChart from "@/components/LineChart";
+
+function shortDate(day: string) {
+  const [, m, d] = day.split("-");
+  return `${Number(d)}/${Number(m)}`;
+}
 
 export default function WeightPage() {
   const [weights, setWeights] = useState<Weight[]>([]);
@@ -53,11 +59,10 @@ export default function WeightPage() {
     ? weeksToGoal(current, goal, profile.deficit)
     : 0;
 
-  // min/max para escalar la mini-gráfica
-  const vals = weights.map((w) => w.weightKg);
-  const minV = Math.min(goal, ...vals, current);
-  const maxV = Math.max(start, ...vals, current);
-  const range = maxV - minV || 1;
+  // puntos para la gráfica (cronológico: viejo -> nuevo)
+  const points = [...weights]
+    .reverse()
+    .map((w) => ({ label: shortDate(w.day), value: w.weightKg }));
 
   return (
     <main className="mx-auto max-w-md px-4 pb-28 pt-6">
@@ -108,7 +113,22 @@ export default function WeightPage() {
         )}
       </section>
 
-      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow p-3">
+      {points.length > 1 && (
+        <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow p-4">
+          <h2 className="mb-2 text-sm font-medium text-[var(--color-muted)]">
+            Evolución
+          </h2>
+          <LineChart
+            points={points}
+            color="var(--color-accent)"
+            goal={goal}
+            unit=" kg"
+            height={150}
+          />
+        </section>
+      )}
+
+      <section className="mb-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow p-3">
         <div className="flex gap-2">
           <input
             type="number"
@@ -129,27 +149,41 @@ export default function WeightPage() {
         </div>
       </section>
 
+      <p className="mb-4 px-1 text-center text-[12px] leading-relaxed text-[var(--color-muted)]">
+        Tu plan se ajusta solo cada que registras tu peso. Pésate ~1 vez por
+        semana, en ayunas y sin ropa, para un dato confiable (el peso diario
+        sube y baja por agua).
+      </p>
+
       {weights.length > 0 && (
         <section className="space-y-1.5">
           <h2 className="px-1 text-sm font-medium text-[var(--color-muted)]">
             Registros
           </h2>
-          {weights.map((w) => {
-            const pos = ((maxV - w.weightKg) / range) * 100;
+          {weights.map((w, i) => {
+            const older = weights[i + 1];
+            const delta = older ? w.weightKg - older.weightKg : 0;
             return (
               <div
                 key={w.id}
-                className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow px-3 py-2"
+                className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow px-4 py-2.5"
               >
-                <span className="w-20 text-xs capitalize text-[var(--color-muted)]">
+                <span className="flex-1 text-[13px] capitalize text-[var(--color-muted)]">
                   {relativeDay(w.day, today)}
                 </span>
-                <div className="relative h-1.5 flex-1 rounded-full bg-[var(--color-surface-2)]">
-                  <div
-                    className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-[var(--color-accent)]"
-                    style={{ left: `calc(${pos}% - 6px)` }}
-                  />
-                </div>
+                {older && delta !== 0 && (
+                  <span
+                    className="text-[12px] tabular-nums"
+                    style={{
+                      color:
+                        delta < 0
+                          ? "var(--color-fat)"
+                          : "var(--color-danger)",
+                    }}
+                  >
+                    {delta < 0 ? "▾" : "▴"} {Math.abs(delta).toFixed(1)}
+                  </span>
+                )}
                 <span className="w-16 text-right font-medium tabular-nums">
                   {w.weightKg} kg
                 </span>
