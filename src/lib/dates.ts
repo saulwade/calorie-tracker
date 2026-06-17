@@ -1,3 +1,11 @@
+/** Hora local "8:45" a partir de un timestamp (epoch ms). */
+export function clockTime(ms: number): string {
+  return new Date(ms).toLocaleTimeString("es-MX", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 /** Devuelve el día local (del navegador) en formato YYYY-MM-DD. */
 export function localDay(d: Date = new Date()): string {
   const y = d.getFullYear();

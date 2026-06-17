@@ -8,7 +8,7 @@ import Composer, { type ComposerPayload } from "@/components/Composer";
 import MealRow from "@/components/MealRow";
 import Nav from "@/components/Nav";
 import TotalsBar, { type Totals } from "@/components/TotalsBar";
-import { GearIcon, FlameIcon, StarIcon } from "@/components/icons";
+import { GearIcon, FlameIcon, StarIcon, ClockIcon, CloseIcon } from "@/components/icons";
 
 type Pending = {
   tempId: number;
@@ -58,6 +58,11 @@ export default function TodayPage() {
     });
     setAddingFav(null);
     await load();
+  }
+
+  async function deleteFavorite(id: number) {
+    setFavorites((prev) => prev.filter((f) => f.id !== id));
+    await fetch(`/api/favorites?id=${id}`, { method: "DELETE" });
   }
 
   useEffect(() => {
@@ -113,6 +118,20 @@ export default function TodayPage() {
     omega3: sum(meals, "omega3"),
   };
 
+  // Aviso de "próxima comida" (≈3 h después de la última).
+  const lastMealMs = meals.reduce((mx, x) => Math.max(mx, x.loggedAt), 0);
+  let nextMealHint = "";
+  if (lastMealMs) {
+    const diffMin = Math.round((lastMealMs + 3 * 3600_000 - Date.now()) / 60000);
+    if (diffMin > 5) {
+      const h = Math.floor(diffMin / 60);
+      const mm = diffMin % 60;
+      nextMealHint = `Próxima comida en ~${h ? `${h} h ` : ""}${mm} min`;
+    } else {
+      nextMealHint = "Buen momento para tu próxima comida";
+    }
+  }
+
   return (
     <main className="min-h-screen">
       {/* Header */}
@@ -122,6 +141,12 @@ export default function TodayPage() {
           <p className="text-[13px] capitalize text-[var(--color-muted)]">
             {prettyDay(today)}
           </p>
+          {nextMealHint && (
+            <p className="mt-1 flex items-center gap-1 text-[12px] font-medium text-[var(--color-accent)]">
+              <ClockIcon size={13} />
+              {nextMealHint}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {streak > 0 && (
@@ -149,18 +174,29 @@ export default function TodayPage() {
         {favorites.length > 0 && (
           <div className="mb-3 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none]">
             {favorites.map((fav) => (
-              <button
+              <div
                 key={fav.id}
-                onClick={() => logFavorite(fav)}
-                disabled={addingFav === fav.id}
-                className="flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] text-[var(--color-text)] soft-shadow transition active:scale-95 disabled:opacity-50"
+                className="flex shrink-0 items-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow"
               >
-                <StarIcon size={13} className="text-[var(--color-accent)]" />
-                <span className="whitespace-nowrap">{fav.name}</span>
-                <span className="tabular-nums text-[var(--color-muted)]">
-                  {Math.round(fav.calories)}
-                </span>
-              </button>
+                <button
+                  onClick={() => logFavorite(fav)}
+                  disabled={addingFav === fav.id}
+                  className="flex items-center gap-1.5 py-1.5 pl-3 text-[13px] text-[var(--color-text)] transition active:scale-95 disabled:opacity-50"
+                >
+                  <StarIcon size={13} className="shrink-0 text-[var(--color-accent)]" />
+                  <span className="max-w-[150px] truncate">{fav.name}</span>
+                  <span className="shrink-0 tabular-nums text-[var(--color-muted)]">
+                    {Math.round(fav.calories)}
+                  </span>
+                </button>
+                <button
+                  onClick={() => deleteFavorite(fav.id)}
+                  className="grid h-7 w-7 shrink-0 place-items-center pr-1 text-[var(--color-muted)] transition active:scale-90"
+                  aria-label="Borrar favorito"
+                >
+                  <CloseIcon size={12} />
+                </button>
+              </div>
             ))}
           </div>
         )}

@@ -97,6 +97,18 @@ export const favorites = sqliteTable("favorites", {
   score: real("score").notNull().default(0),
   tip: text("tip").notNull().default(""),
   createdAt: integer("created_at").notNull().default(0),
+
+  // Micronutrientes + desglose (para no perderlos al registrar desde favorito).
+  iron: real("iron").notNull().default(0),
+  potassium: real("potassium").notNull().default(0),
+  magnesium: real("magnesium").notNull().default(0),
+  zinc: real("zinc").notNull().default(0),
+  calcium: real("calcium").notNull().default(0),
+  vitC: real("vit_c").notNull().default(0),
+  vitD: real("vit_d").notNull().default(0),
+  vitB12: real("vit_b12").notNull().default(0),
+  omega3: real("omega3").notNull().default(0),
+  items: text("items").notNull().default("[]"),
 });
 
 /**

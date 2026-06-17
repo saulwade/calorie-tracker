@@ -21,7 +21,17 @@ async function ensureTable() {
       vitamins TEXT NOT NULL DEFAULT '[]',
       score REAL NOT NULL DEFAULT 0,
       tip TEXT NOT NULL DEFAULT '',
-      created_at INTEGER NOT NULL DEFAULT 0
+      created_at INTEGER NOT NULL DEFAULT 0,
+      iron REAL NOT NULL DEFAULT 0,
+      potassium REAL NOT NULL DEFAULT 0,
+      magnesium REAL NOT NULL DEFAULT 0,
+      zinc REAL NOT NULL DEFAULT 0,
+      calcium REAL NOT NULL DEFAULT 0,
+      vit_c REAL NOT NULL DEFAULT 0,
+      vit_d REAL NOT NULL DEFAULT 0,
+      vit_b12 REAL NOT NULL DEFAULT 0,
+      omega3 REAL NOT NULL DEFAULT 0,
+      items TEXT NOT NULL DEFAULT '[]'
     );
   `);
   ensured = true;
@@ -67,6 +77,16 @@ export async function POST(req: NextRequest) {
       score: m.score,
       tip: m.tip,
       createdAt: Date.now(),
+      iron: m.iron,
+      potassium: m.potassium,
+      magnesium: m.magnesium,
+      zinc: m.zinc,
+      calcium: m.calcium,
+      vitC: m.vitC,
+      vitD: m.vitD,
+      vitB12: m.vitB12,
+      omega3: m.omega3,
+      items: m.items,
     })
     .returning();
   return NextResponse.json({ favorite: inserted[0] });

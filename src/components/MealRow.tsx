@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Meal, Profile } from "@/db/schema";
 import { SparkleIcon, TrashIcon, SendIcon, StarIcon } from "./icons";
 import { mealAlerts } from "@/lib/alerts";
+import { clockTime } from "@/lib/dates";
 
 export function scoreColor(s: number): string {
   if (s >= 8) return "var(--color-fat)"; // verde
@@ -113,13 +114,14 @@ export default function MealRow({
           <span className="text-[15px] leading-snug text-[var(--color-text)]">
             {meal.name}
           </span>
-          {alerts.length > 0 && (
-            <span className="flex flex-wrap gap-1">
-              {alerts.map((a) => (
-                <AlertChip key={a.label} alert={a} />
-              ))}
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="text-[12px] tabular-nums text-[var(--color-muted)]">
+              {clockTime(meal.loggedAt)}
             </span>
-          )}
+            {alerts.map((a) => (
+              <AlertChip key={a.label} alert={a} />
+            ))}
+          </span>
         </span>
         <span className="mt-0.5 flex shrink-0 flex-col items-end gap-1">
           <span className="flex items-center gap-1 whitespace-nowrap text-[15px]">
