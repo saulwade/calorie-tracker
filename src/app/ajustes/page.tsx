@@ -171,6 +171,20 @@ export default function SettingsPage() {
           <Goal label="Azúcar (máx)" value={`${p.targetSugar} g`} />
           <Goal label="Sodio (máx)" value={`${p.targetSodium} mg`} />
         </div>
+        <p className="mt-3 text-[12px] leading-snug text-[var(--color-muted)]">
+          {p.estimatedTdee > 0 ? (
+            <>
+              Ajustado a tu <span className="font-medium text-[var(--color-text)]">gasto real</span>{" "}
+              estimado con tus datos: ~{p.estimatedTdee} kcal/día. Se recalcula solo
+              conforme registras.
+            </>
+          ) : (
+            <>
+              Calculado con fórmula (Mifflin-St Jeor). Tras ~2 semanas de registro
+              constante, el plan se ajustará a tu <span className="font-medium text-[var(--color-text)]">gasto real</span>.
+            </>
+          )}
+        </p>
       </section>
 
       <button

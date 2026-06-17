@@ -40,7 +40,7 @@ export interface Targets {
   bmr: number;
 }
 
-export function calcTargets(input: TargetInput): Targets {
+export function calcTargets(input: TargetInput, tdeeOverride?: number): Targets {
   const { sex, age, heightCm, weightKg, goalWeightKg, activity, deficit } =
     input;
 
@@ -48,8 +48,12 @@ export function calcTargets(input: TargetInput): Targets {
   const s = sex === "male" ? 5 : -161;
   const bmr = Math.round(10 * weightKg + 6.25 * heightCm - 5 * age + s);
 
-  // TDEE = gasto total estimado
-  const tdee = Math.round(bmr * ACTIVITY_FACTORS[activity]);
+  // TDEE = gasto total. Usa el estimado por DATOS si se pasa (dinámico,
+  // estilo MacroFactor); si no, la fórmula Mifflin × actividad.
+  const tdee =
+    tdeeOverride && tdeeOverride > 0
+      ? Math.round(tdeeOverride)
+      : Math.round(bmr * ACTIVITY_FACTORS[activity]);
 
   // Meta = TDEE - déficit, con piso de seguridad:
   // nunca bajar del 90% del BMR ni de un mínimo absoluto por sexo.

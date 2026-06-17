@@ -30,6 +30,9 @@ export const profile = sqliteTable("profile", {
   targetSodium: integer("target_sodium").notNull().default(2300),
   targetSugar: integer("target_sugar").notNull().default(40),
 
+  // Gasto estimado por datos (0 = sin datos suficientes; se usa la fórmula).
+  estimatedTdee: integer("estimated_tdee").notNull().default(0),
+
   updatedAt: integer("updated_at").notNull().default(0),
 });
 

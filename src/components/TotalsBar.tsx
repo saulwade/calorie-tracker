@@ -47,6 +47,18 @@ export default function TotalsBar({
       ? "Sodio alto frente al potasio: toma agua y suma potasio (plátano, espinaca, frijol) para no retener líquido."
       : "";
 
+  // "Te falta hoy" (qué comer en lo que resta del día), en porciones de mano.
+  const remCal = Math.round(profile.targetCalories - totals.calories);
+  const remProtPalmas = Math.max(
+    0,
+    Math.round((profile.targetProtein - totals.protein) / 24),
+  );
+  const remCarbManos = Math.max(
+    0,
+    Math.round((profile.targetCarbs - totals.carbs) / 25),
+  );
+  const showFalta = totals.calories > 0 && remCal > 100;
+
   return (
     <div className="mx-auto w-full max-w-md px-3">
       {open && (
@@ -115,6 +127,20 @@ export default function TotalsBar({
             <p className="mt-3 rounded-xl bg-[var(--color-cal)]/8 px-3 py-2 text-[12px] leading-snug text-[var(--color-text)]">
               {naKHint}
             </p>
+          )}
+
+          {showFalta && (
+            <div className="mt-4 rounded-xl bg-[var(--color-accent)]/8 px-3 py-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-accent)]">
+                Te falta hoy
+              </p>
+              <p className="mt-0.5 text-[13px] leading-snug text-[var(--color-text)]">
+                ~{remProtPalmas} {remProtPalmas === 1 ? "palma" : "palmas"} de
+                proteína · ~{remCarbManos}{" "}
+                {remCarbManos === 1 ? "mano" : "manos"} de carbo ·{" "}
+                <span className="tabular-nums">{remCal}</span> kcal
+              </p>
+            </div>
           )}
 
           <PortionGuide profile={profile} />

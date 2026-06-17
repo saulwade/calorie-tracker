@@ -1,8 +1,14 @@
 import { db, schema } from "@/db";
 import { type Profile } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { calcTargets, type ActivityLevel } from "./nutrition";
 import { currentTrend } from "./weight";
+import { estimateExpenditure } from "./adaptive";
+
+function serverLocalDay(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 /**
  * Peso de TENDENCIA (media móvil), para ajustar el plan sin el ruido del día.
@@ -71,7 +77,7 @@ export async function updateProfile(update: ProfileUpdate): Promise<Profile> {
   // contigo sin reaccionar al ruido diario. Si no hay registro, usa el inicial.
   const currentWeight = (await getTrendWeight()) ?? merged.startWeightKg;
 
-  const t = calcTargets({
+  const baseInput = {
     sex: merged.sex,
     age: merged.age,
     heightCm: merged.heightCm,
@@ -79,7 +85,40 @@ export async function updateProfile(update: ProfileUpdate): Promise<Profile> {
     goalWeightKg: merged.goalWeightKg,
     activity: merged.activity,
     deficit: merged.deficit,
-  });
+  };
+
+  // Metas con la fórmula (Mifflin) — también es el respaldo.
+  const mifflin = calcTargets(baseInput);
+
+  // ¿Hay datos suficientes para un gasto DINÁMICO (estilo MacroFactor)?
+  let estimatedTdee = 0;
+  let t = mifflin;
+  try {
+    const dayCals = await db
+      .select({
+        day: schema.meals.day,
+        calories: sql<number>`sum(${schema.meals.calories})`,
+        count: sql<number>`count(*)`,
+      })
+      .from(schema.meals)
+      .groupBy(schema.meals.day);
+    const weights = await db
+      .select({ day: schema.weights.day, weightKg: schema.weights.weightKg })
+      .from(schema.weights);
+
+    const est = estimateExpenditure(dayCals, weights, serverLocalDay());
+    if (est) {
+      // clamp a ±40% de la fórmula para no dispararse con datos raros
+      const clamped = Math.min(
+        Math.round(mifflin.tdee * 1.4),
+        Math.max(Math.round(mifflin.tdee * 0.6), est.tdee),
+      );
+      estimatedTdee = clamped;
+      t = calcTargets(baseInput, clamped);
+    }
+  } catch {
+    // si algo falla, nos quedamos con la fórmula
+  }
 
   const m = update.manualTargets ?? {};
 
@@ -94,6 +133,7 @@ export async function updateProfile(update: ProfileUpdate): Promise<Profile> {
       targetFiber: m.targetFiber ?? t.fiber,
       targetSodium: m.targetSodium ?? t.sodium,
       targetSugar: m.targetSugar ?? t.sugar,
+      estimatedTdee,
       updatedAt: Date.now(),
     })
     .where(eq(schema.profile.id, 1));
