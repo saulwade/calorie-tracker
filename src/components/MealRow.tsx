@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { Meal } from "@/db/schema";
-import { SparkleIcon, TrashIcon, SendIcon } from "./icons";
+import type { Meal, Profile } from "@/db/schema";
+import { SparkleIcon, TrashIcon, SendIcon, StarIcon } from "./icons";
+import { mealAlerts } from "@/lib/alerts";
 
 const CONF_LABEL: Record<string, string> = {
   alta: "Confianza alta",
@@ -21,11 +22,31 @@ function fmtScore(s: number): string {
   return (Math.round(s * 10) / 10).toString();
 }
 
+function AlertChip({
+  alert,
+}: {
+  alert: { label: string; level: "warn" | "danger" };
+}) {
+  const cls =
+    alert.level === "danger"
+      ? "text-[var(--color-danger)] bg-[var(--color-danger)]/10"
+      : "text-[var(--color-cal)] bg-[var(--color-cal)]/10";
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${cls}`}
+    >
+      {alert.label}
+    </span>
+  );
+}
+
 export default function MealRow({
   meal,
+  profile,
   onChanged,
 }: {
   meal: Meal;
+  profile: Profile | null;
   onChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -34,6 +55,10 @@ export default function MealRow({
   const [adjusting, setAdjusting] = useState(false);
   const [manual, setManual] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingFav, setSavingFav] = useState(false);
+  const [faved, setFaved] = useState(false);
+
+  const alerts = mealAlerts(meal, profile);
   const [fields, setFields] = useState({
     name: meal.name,
     calories: meal.calories,
@@ -78,14 +103,34 @@ export default function MealRow({
     onChanged();
   }
 
+  async function saveFavorite() {
+    setSavingFav(true);
+    await fetch("/api/favorites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mealId: meal.id }),
+    });
+    setSavingFav(false);
+    setFaved(true);
+  }
+
   return (
-    <div className="border-b border-[var(--color-border)]/70">
+    <div className="row-in border-b border-[var(--color-border)]/70">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-start gap-4 py-3.5 text-left"
+        className="flex w-full items-start gap-4 py-3.5 text-left transition active:opacity-70"
       >
-        <span className="flex-1 text-[15px] leading-snug text-[var(--color-text)]">
-          {meal.name}
+        <span className="flex flex-1 flex-col gap-1.5">
+          <span className="text-[15px] leading-snug text-[var(--color-text)]">
+            {meal.name}
+          </span>
+          {alerts.length > 0 && (
+            <span className="flex flex-wrap gap-1">
+              {alerts.map((a) => (
+                <AlertChip key={a.label} alert={a} />
+              ))}
+            </span>
+          )}
         </span>
         <span className="mt-0.5 flex shrink-0 flex-col items-end gap-1">
           <span className="flex items-center gap-1 whitespace-nowrap text-[15px]">
@@ -179,12 +224,22 @@ export default function MealRow({
               </div>
 
               <div className="flex items-center justify-between">
-                <button
-                  onClick={() => setManual(true)}
-                  className="text-[12px] text-[var(--color-muted)] underline"
-                >
-                  Corregir a mano
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={saveFavorite}
+                    disabled={savingFav || faved}
+                    className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] text-[var(--color-accent)] transition hover:bg-[var(--color-accent)]/10 disabled:opacity-50"
+                  >
+                    <StarIcon size={14} />
+                    {faved ? "Guardado" : savingFav ? "…" : "Favorito"}
+                  </button>
+                  <button
+                    onClick={() => setManual(true)}
+                    className="rounded-full px-3 py-1.5 text-[12px] text-[var(--color-muted)]"
+                  >
+                    Corregir
+                  </button>
+                </div>
                 <button
                   onClick={del}
                   disabled={deleting}

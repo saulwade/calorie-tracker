@@ -4,6 +4,18 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Sonnet por defecto: suficiente para estimar nutrición y mucho más barato que Opus.
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 
+export interface MealMicros {
+  iron: number; // mg
+  potassium: number; // mg
+  magnesium: number; // mg
+  zinc: number; // mg
+  calcium: number; // mg
+  vitC: number; // mg
+  vitD: number; // mcg
+  vitB12: number; // mcg
+  omega3: number; // g
+}
+
 export interface FoodAnalysis {
   name: string;
   calories: number;
@@ -14,6 +26,7 @@ export interface FoodAnalysis {
   sodium: number;
   sugar: number;
   vitamins: { name: string; amount: number; unit: string; pctDV?: number }[];
+  micros: MealMicros;
   confidence: "alta" | "media" | "baja";
   notes: string;
   score: number;
@@ -79,6 +92,33 @@ const FOOD_TOOL: Anthropic.Tool = {
         description:
           "Consejo breve y amable de nutriólogo (1 frase), en español, SIN emojis. Da sugerencias en PORCIONES DE COMIDA REAL, nunca en gramos (ej. 'cambia el refresco por agua' o 'agrega una palma de pollo'). Motivador, no regañón.",
       },
+      micros: {
+        type: "object",
+        description:
+          "Micronutrientes clave para energía presentes en ESTA comida (la porción descrita). Usa SIEMPRE las unidades indicadas. Si un micro es ~0 en esta comida, pon 0. No los dejes vacíos.",
+        properties: {
+          iron: { type: "number", description: "Hierro (mg)" },
+          potassium: { type: "number", description: "Potasio (mg)" },
+          magnesium: { type: "number", description: "Magnesio (mg)" },
+          zinc: { type: "number", description: "Zinc (mg)" },
+          calcium: { type: "number", description: "Calcio (mg)" },
+          vitC: { type: "number", description: "Vitamina C (mg)" },
+          vitD: { type: "number", description: "Vitamina D (mcg)" },
+          vitB12: { type: "number", description: "Vitamina B12 (mcg)" },
+          omega3: { type: "number", description: "Omega-3 ALA+EPA+DHA (g)" },
+        },
+        required: [
+          "iron",
+          "potassium",
+          "magnesium",
+          "zinc",
+          "calcium",
+          "vitC",
+          "vitD",
+          "vitB12",
+          "omega3",
+        ],
+      },
     },
     required: [
       "name",
@@ -94,6 +134,7 @@ const FOOD_TOOL: Anthropic.Tool = {
       "notes",
       "score",
       "tip",
+      "micros",
     ],
   },
 };
@@ -188,6 +229,7 @@ export async function analyzeFood({
     sodium: num(input.sodium),
     sugar: num(input.sugar),
     vitamins: Array.isArray(input.vitamins) ? input.vitamins : [],
+    micros: parseMicros(input.micros),
     confidence: input.confidence ?? "media",
     notes: input.notes ?? "",
     score: typeof input.score === "number" ? input.score : num(input.score),
@@ -198,6 +240,21 @@ export async function analyzeFood({
 function num(v: unknown): number {
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0;
+}
+
+function parseMicros(v: unknown): MealMicros {
+  const o = (v ?? {}) as Partial<Record<keyof MealMicros, unknown>>;
+  return {
+    iron: num(o.iron),
+    potassium: num(o.potassium),
+    magnesium: num(o.magnesium),
+    zinc: num(o.zinc),
+    calcium: num(o.calcium),
+    vitC: num(o.vitC),
+    vitD: num(o.vitD),
+    vitB12: num(o.vitB12),
+    omega3: num(o.omega3),
+  };
 }
 
 /* ============== NUTRIÓLOGO: evaluación del día ============== */
@@ -385,6 +442,148 @@ export async function coachDay(input: {
   return {
     dayScore: typeof out.dayScore === "number" ? out.dayScore : num(out.dayScore),
     verdict: out.verdict ?? "",
+    good: Array.isArray(out.good) ? out.good : [],
+    improve: Array.isArray(out.improve) ? out.improve : [],
+  };
+}
+
+/* ============== NUTRIÓLOGO: resumen semanal ============== */
+
+export interface WeekCoaching {
+  weekScore: number;
+  verdict: string;
+  tendencia: string;
+  good: string[];
+  improve: string[];
+}
+
+const WEEK_TOOL: Anthropic.Tool = {
+  name: "evaluar_semana",
+  description:
+    "Evalúa los últimos 7 días de alimentación del usuario en conjunto, como su nutriólogo, considerando consistencia y tendencia de peso.",
+  input_schema: {
+    type: "object",
+    properties: {
+      weekScore: {
+        type: "number",
+        description:
+          "Calificación de la semana de 0 a 10 (premiando consistencia y calidad según su objetivo de bajar de peso). Decimales permitidos.",
+      },
+      verdict: {
+        type: "string",
+        description: "1-2 frases resumiendo la semana, motivador y honesto (no regañón).",
+      },
+      tendencia: {
+        type: "string",
+        description:
+          "1 frase sobre la tendencia: peso y consistencia de registro (ej. 'Bajaste 0.4 kg y registraste 6 de 7 días').",
+      },
+      good: {
+        type: "array",
+        items: { type: "string" },
+        description: "2-3 cosas que hizo BIEN esta semana. Frases cortas.",
+      },
+      improve: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "2-3 consejos para la próxima semana, en PORCIONES DE COMIDA REAL (nunca gramos), concretos.",
+      },
+    },
+    required: ["weekScore", "verdict", "tendencia", "good", "improve"],
+  },
+};
+
+const WEEK_SYSTEM = `Eres el nutriólogo personal y coach del usuario, evaluando su SEMANA completa (últimos 7 días). Meta: que aprenda a comer bien y baje de peso de forma sana, sin culpa.
+- Motivador, cercano y honesto. Nada de regaños. Sin emojis.
+- Premia la CONSISTENCIA (días registrados) además de la calidad de la comida.
+- Consejos en PORCIONES DE COMIDA REAL (una palma de pollo, un puño de arroz, una fruta), NUNCA en gramos.
+- Considera la tendencia de peso si hay datos.
+- Responde SIEMPRE llamando a la herramienta 'evaluar_semana'. Todo en español.`;
+
+export async function coachWeek(input: {
+  days: {
+    day: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber: number;
+    sugar: number;
+    sodium: number;
+    count: number;
+  }[];
+  targets: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber: number;
+    sugar: number;
+    sodium: number;
+  };
+  weights: { day: string; weightKg: number }[];
+}): Promise<WeekCoaching> {
+  const t = input.targets;
+  const withData = input.days.filter((d) => d.count > 0);
+  const n = withData.length || 1;
+  const avg = (k: keyof (typeof withData)[number]) =>
+    Math.round(withData.reduce((a, d) => a + (Number(d[k]) || 0), 0) / n);
+
+  const perDay = input.days.length
+    ? input.days
+        .map((d) =>
+          d.count > 0
+            ? `- ${d.day}: ${Math.round(d.calories)} kcal (P${Math.round(d.protein)} C${Math.round(d.carbs)} G${Math.round(d.fat)}), ${d.count} comidas`
+            : `- ${d.day}: sin registro`,
+        )
+        .join("\n")
+    : "(no registró nada esta semana)";
+
+  const w = [...input.weights].sort((a, b) => a.day.localeCompare(b.day));
+  let weightLine = "Sin registros de peso esta semana.";
+  if (w.length >= 2) {
+    const delta = Math.round((w[w.length - 1].weightKg - w[0].weightKg) * 10) / 10;
+    weightLine = `Peso: de ${w[0].weightKg} kg a ${w[w.length - 1].weightKg} kg, cambio ${delta > 0 ? "+" : ""}${delta} kg.`;
+  } else if (w.length === 1) {
+    weightLine = `Peso registrado: ${w[0].weightKg} kg.`;
+  }
+
+  const userText = `Resumen de los últimos 7 días (día por día):
+${perDay}
+
+Días registrados: ${withData.length} de ${input.days.length || 7}.
+Promedios en días con registro:
+- Calorías: ${avg("calories")} / meta ${t.calories}
+- Proteína: ${avg("protein")} / ${t.protein} g
+- Carbohidratos: ${avg("carbs")} / ${t.carbs} g
+- Grasa: ${avg("fat")} / ${t.fat} g
+- Fibra: ${avg("fiber")} / ${t.fiber} g
+- Azúcar: ${avg("sugar")} / máx ${t.sugar} g
+- Sodio: ${avg("sodium")} / máx ${t.sodium} mg
+
+${weightLine}
+
+Evalúa mi semana completa y dame consejos para la próxima.`;
+
+  const message = await client.messages.create({
+    model: MODEL,
+    max_tokens: 1000,
+    system: WEEK_SYSTEM,
+    tools: [WEEK_TOOL],
+    tool_choice: { type: "tool", name: "evaluar_semana" },
+    messages: [{ role: "user", content: userText }],
+  });
+
+  const toolUse = message.content.find(
+    (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
+  );
+  if (!toolUse) throw new Error("No se pudo evaluar la semana.");
+  const out = toolUse.input as Partial<WeekCoaching>;
+  return {
+    weekScore: typeof out.weekScore === "number" ? out.weekScore : num(out.weekScore),
+    verdict: out.verdict ?? "",
+    tendencia: out.tendencia ?? "",
     good: Array.isArray(out.good) ? out.good : [],
     improve: Array.isArray(out.improve) ? out.improve : [],
   };

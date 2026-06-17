@@ -63,6 +63,37 @@ export const meals = sqliteTable("meals", {
   // Calificación del nutriólogo (0-10) + consejo corto en porciones reales.
   score: real("score").notNull().default(0),
   tip: text("tip").notNull().default(""),
+
+  // Micronutrientes clave para energía (sumables, unidades fijas).
+  iron: real("iron").notNull().default(0), // mg
+  potassium: real("potassium").notNull().default(0), // mg
+  magnesium: real("magnesium").notNull().default(0), // mg
+  zinc: real("zinc").notNull().default(0), // mg
+  calcium: real("calcium").notNull().default(0), // mg
+  vitC: real("vit_c").notNull().default(0), // mg
+  vitD: real("vit_d").notNull().default(0), // mcg
+  vitB12: real("vit_b12").notNull().default(0), // mcg
+  omega3: real("omega3").notNull().default(0), // g
+});
+
+/**
+ * Comidas guardadas como favoritas (registro rápido sin IA).
+ * Columnas espejo de meals (sin day/loggedAt/source/confidence).
+ */
+export const favorites = sqliteTable("favorites", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  calories: real("calories").notNull().default(0),
+  protein: real("protein").notNull().default(0),
+  carbs: real("carbs").notNull().default(0),
+  fat: real("fat").notNull().default(0),
+  fiber: real("fiber").notNull().default(0),
+  sodium: real("sodium").notNull().default(0),
+  sugar: real("sugar").notNull().default(0),
+  vitamins: text("vitamins").notNull().default("[]"),
+  score: real("score").notNull().default(0),
+  tip: text("tip").notNull().default(""),
+  createdAt: integer("created_at").notNull().default(0),
 });
 
 /**
@@ -78,3 +109,4 @@ export const weights = sqliteTable("weights", {
 export type Meal = typeof meals.$inferSelect;
 export type Profile = typeof profile.$inferSelect;
 export type Weight = typeof weights.$inferSelect;
+export type Favorite = typeof favorites.$inferSelect;

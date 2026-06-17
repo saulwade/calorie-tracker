@@ -89,3 +89,52 @@ input[type="number"]::-webkit-inner-spin-button {
 .shimmer {
   animation: shimmer 1.4s ease-in-out infinite;
 }
+
+/* ── Animaciones (transform/opacity, compositor GPU) ───────── */
+
+/* Entrada de filas: fade + slide-up sutil */
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.row-in {
+  animation: row-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+}
+
+/* Panel desplegable (grid 0fr → 1fr): anima alto sin medir px */
+.collapsible {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    grid-template-rows 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.24s ease,
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.collapsible.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: translateY(0);
+}
+.collapsible > .collapsible-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row-in,
+  .shimmer {
+    animation: none;
+  }
+  .collapsible {
+    transition: none;
+  }
+}

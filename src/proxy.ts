@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Rutas que NO requieren contraseña.
-const PUBLIC = ["/login", "/api/login"];
+const PUBLIC = [
+  "/login",
+  "/api/login",
+  "/manifest.webmanifest",
+  "/sw.js",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/apple-touch-icon.png",
+];
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -34,5 +42,7 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|icon-192.png|icon-512.png|apple-touch-icon.png).*)",
+  ],
 };

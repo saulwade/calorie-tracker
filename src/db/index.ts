@@ -8,4 +8,4 @@ const authToken = process.env.TURSO_AUTH_TOKEN || undefined;
 const client = createClient({ url, authToken });
 
 export const db = drizzle(client, { schema });
-export { schema };
+export { schema, client };

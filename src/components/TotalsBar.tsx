@@ -4,6 +4,7 @@ import type { Profile } from "@/db/schema";
 import { FlameIcon } from "./icons";
 import { CalorieRing, MacroBar } from "./Stats";
 import Coach from "./Coach";
+import { MICRO_TARGETS, MICRO_ORDER, type MicroKey } from "@/lib/nutrition";
 
 export type Totals = {
   calories: number;
@@ -13,6 +14,15 @@ export type Totals = {
   fiber: number;
   sugar: number;
   sodium: number;
+  iron: number;
+  potassium: number;
+  magnesium: number;
+  zinc: number;
+  calcium: number;
+  vitC: number;
+  vitD: number;
+  vitB12: number;
+  omega3: number;
 };
 
 export default function TotalsBar({
@@ -30,8 +40,9 @@ export default function TotalsBar({
 }) {
   return (
     <div className="mx-auto w-full max-w-md px-3">
-      {open && (
-        <div className="mb-2 rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 soft-shadow">
+      <div className={`collapsible ${open ? "is-open" : ""}`}>
+        <div className="collapsible-inner pb-2">
+        <div className="rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 soft-shadow">
           <div className="mb-4 flex justify-center">
             <CalorieRing
               consumed={totals.calories}
@@ -84,9 +95,12 @@ export default function TotalsBar({
             </span>
           </div>
 
-          <Coach day={day} />
+          <MicroGrid totals={totals} />
+
+          {open && <Coach day={day} />}
         </div>
-      )}
+        </div>
+      </div>
 
       <button
         onClick={onToggle}
@@ -155,6 +169,52 @@ function MacroSplit({ profile }: { profile: Profile }) {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/** Micronutrientes del día: barra por micro con indicador bajo/ok. */
+function MicroGrid({ totals }: { totals: Totals }) {
+  return (
+    <div className="mt-4 border-t border-[var(--color-border)] pt-3">
+      <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wide text-[var(--color-muted)]">
+        Micronutrientes · energía
+      </p>
+      <div className="grid grid-cols-3 gap-x-3 gap-y-3">
+        {MICRO_ORDER.map((key: MicroKey) => {
+          const meta = MICRO_TARGETS[key];
+          const value = totals[key];
+          const ratio = meta.target > 0 ? value / meta.target : 0;
+          const pct = Math.min(ratio * 100, 100);
+          const color =
+            ratio >= 0.8
+              ? "var(--color-fat)"
+              : ratio >= 0.5
+                ? "var(--color-protein)"
+                : "var(--color-danger)";
+          const show = value >= 10 ? Math.round(value) : Math.round(value * 10) / 10;
+          return (
+            <div key={key}>
+              <div className="mb-1 flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
+                <span className="text-[12px] font-medium text-[var(--color-text)]">
+                  {meta.label}
+                </span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-surface-2)]">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${pct}%`, background: color }}
+                />
+              </div>
+              <div className="mt-1 text-[11px] tabular-nums text-[var(--color-muted)]">
+                {show}/{meta.target}
+                {meta.unit}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

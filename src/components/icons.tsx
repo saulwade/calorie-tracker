@@ -94,6 +94,12 @@ export const CloseIcon = ({ className, size }: P) => (
   </svg>
 );
 
+export const StarIcon = ({ className, size }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.2 1 5.8L12 17.2 6.8 19.9l1-5.8-4.3-4.2 5.9-.9L12 3.5Z" />
+  </svg>
+);
+
 export const LeafIcon = ({ className, size }: P) => (
   <svg {...base(size)} className={className}>
     <path d="M11 20.5C5 20 3.5 14 4 7c5 .5 9 1.5 11 4.5 1.8 2.7 1.3 6.4-1 8.3-1.4 1.1-2.6 1-3 .7Z" />

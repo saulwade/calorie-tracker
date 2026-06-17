@@ -5,11 +5,24 @@ import type { Profile } from "@/db/schema";
 import { localDay, relativeDay } from "@/lib/dates";
 import Nav from "@/components/Nav";
 import LineChart from "@/components/LineChart";
+import { scoreColor } from "@/components/MealRow";
+import { SparkleIcon } from "@/components/icons";
 
 function shortDate(day: string) {
   const [, m, d] = day.split("-");
   return `${Number(d)}/${Number(m)}`;
 }
+
+type WeekCoaching = {
+  weekScore: number;
+  verdict: string;
+  tendencia: string;
+  good: string[];
+  improve: string[];
+};
+
+const LS_WEEK = "pct_week";
+const LS_WEEK_DAY = "pct_week_day";
 
 type DayRow = {
   day: string;
@@ -27,6 +40,9 @@ export default function HistoryPage() {
   const [days, setDays] = useState<DayRow[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [week, setWeek] = useState<WeekCoaching | null>(null);
+  const [weekLoading, setWeekLoading] = useState(false);
+  const [weekMsg, setWeekMsg] = useState("");
   const today = localDay();
 
   useEffect(() => {
@@ -42,6 +58,39 @@ export default function HistoryPage() {
       setLoading(false);
     })();
   }, []);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(LS_WEEK);
+      const storedDay = localStorage.getItem(LS_WEEK_DAY);
+      if (stored && storedDay === today) setWeek(JSON.parse(stored));
+    } catch {}
+  }, [today]);
+
+  async function evaluateWeek() {
+    setWeekLoading(true);
+    setWeekMsg("");
+    try {
+      const res = await fetch("/api/coach/week");
+      const data = await res.json();
+      if (data.empty) {
+        setWeekMsg(data.message);
+        setWeek(null);
+      } else if (!res.ok) {
+        setWeekMsg(data.error ?? "Error");
+      } else {
+        setWeek(data.coaching);
+        try {
+          localStorage.setItem(LS_WEEK, JSON.stringify(data.coaching));
+          localStorage.setItem(LS_WEEK_DAY, today);
+        } catch {}
+      }
+    } catch {
+      setWeekMsg("No se pudo generar el resumen. Intenta de nuevo.");
+    } finally {
+      setWeekLoading(false);
+    }
+  }
 
   const target = profile?.targetCalories ?? 2000;
   const avg =
@@ -60,6 +109,81 @@ export default function HistoryPage() {
           </p>
         )}
       </header>
+
+      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow p-4">
+        {!week ? (
+          <button
+            onClick={evaluateWeek}
+            disabled={weekLoading}
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-[var(--color-accent)] py-2.5 text-[14px] font-medium text-white transition active:scale-[0.98] disabled:opacity-60"
+          >
+            {weekLoading ? (
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                Analizando tu semana…
+              </>
+            ) : (
+              <>
+                <SparkleIcon size={15} />
+                Resumen de la semana con el nutriólogo
+              </>
+            )}
+          </button>
+        ) : (
+          <div>
+            <div className="mb-2 flex items-center gap-3">
+              <div
+                className="grid h-12 w-12 shrink-0 place-items-center rounded-full text-[17px] font-bold tabular-nums text-white"
+                style={{ background: scoreColor(week.weekScore) }}
+              >
+                {Math.round(week.weekScore * 10) / 10}
+              </div>
+              <div>
+                <p className="text-[13px] leading-snug text-[var(--color-text)]">
+                  {week.verdict}
+                </p>
+                {week.tendencia && (
+                  <p className="mt-0.5 text-[12px] leading-snug text-[var(--color-muted)]">
+                    {week.tendencia}
+                  </p>
+                )}
+              </div>
+            </div>
+            {week.good.length > 0 && (
+              <ul className="mb-2 space-y-1">
+                {week.good.map((g, i) => (
+                  <li key={i} className="flex gap-2 text-[13px] text-[var(--color-text)]">
+                    <span style={{ color: "var(--color-fat)" }}>✓</span>
+                    {g}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {week.improve.length > 0 && (
+              <ul className="space-y-1">
+                {week.improve.map((t, i) => (
+                  <li key={i} className="flex gap-2 text-[13px] text-[var(--color-text)]">
+                    <span style={{ color: "var(--color-accent)" }}>→</span>
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button
+              onClick={evaluateWeek}
+              disabled={weekLoading}
+              className="mt-3 text-[12px] text-[var(--color-muted)] underline"
+            >
+              {weekLoading ? "Analizando…" : "Volver a generar"}
+            </button>
+          </div>
+        )}
+        {weekMsg && (
+          <p className="mt-2 text-center text-[13px] text-[var(--color-muted)]">
+            {weekMsg}
+          </p>
+        )}
+      </section>
 
       {days.length > 1 && (
         <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow p-4">

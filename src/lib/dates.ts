@@ -17,6 +17,34 @@ export function prettyDay(dayStr: string): string {
   });
 }
 
+/** Resta/suma n días a un YYYY-MM-DD (calendario local) y devuelve YYYY-MM-DD. */
+export function addDays(dayStr: string, n: number): string {
+  const [y, m, d] = dayStr.split("-").map(Number);
+  return localDay(new Date(y, m - 1, d + n));
+}
+
+/**
+ * Racha: nº de días CONSECUTIVOS con al menos 1 comida, terminando hoy o ayer.
+ * Si hoy aún no registra nada, la racha NO se rompe (se ancla en ayer).
+ */
+export function calcStreak(loggedDays: Iterable<string>, today: string): number {
+  const set = loggedDays instanceof Set ? loggedDays : new Set(loggedDays);
+  let cursor: string;
+  if (set.has(today)) {
+    cursor = today;
+  } else {
+    const yesterday = addDays(today, -1);
+    if (!set.has(yesterday)) return 0;
+    cursor = yesterday;
+  }
+  let streak = 0;
+  while (set.has(cursor)) {
+    streak++;
+    cursor = addDays(cursor, -1);
+  }
+  return streak;
+}
+
 /** Día relativo legible (Hoy / Ayer / fecha). */
 export function relativeDay(dayStr: string, today: string): string {
   if (dayStr === today) return "Hoy";

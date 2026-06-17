@@ -85,6 +85,50 @@ export function calcTargets(input: TargetInput): Targets {
   return { calories, protein, carbs, fat, fiber, sodium, sugar, tdee, bmr };
 }
 
+/**
+ * Metas diarias de micronutrientes clave para energía y salud.
+ * Hombre adulto 19-30 años. Fuente: DRI/RDA del Institute of Medicine
+ * (National Academies). Potasio y omega-3 (ALA) son AI, no RDA.
+ */
+export type MicroKey =
+  | "iron"
+  | "potassium"
+  | "magnesium"
+  | "zinc"
+  | "calcium"
+  | "vitC"
+  | "vitD"
+  | "vitB12"
+  | "omega3";
+
+export const MICRO_TARGETS: Record<
+  MicroKey,
+  { label: string; target: number; unit: string }
+> = {
+  iron: { label: "Hierro", target: 8, unit: "mg" },
+  potassium: { label: "Potasio", target: 3400, unit: "mg" },
+  magnesium: { label: "Magnesio", target: 400, unit: "mg" },
+  zinc: { label: "Zinc", target: 11, unit: "mg" },
+  calcium: { label: "Calcio", target: 1000, unit: "mg" },
+  vitC: { label: "Vitamina C", target: 90, unit: "mg" },
+  vitD: { label: "Vitamina D", target: 15, unit: "mcg" },
+  vitB12: { label: "Vitamina B12", target: 2.4, unit: "mcg" },
+  omega3: { label: "Omega-3", target: 1.6, unit: "g" },
+};
+
+// Orden de despliegue: primero los más ligados a energía.
+export const MICRO_ORDER: MicroKey[] = [
+  "iron",
+  "potassium",
+  "magnesium",
+  "vitB12",
+  "omega3",
+  "zinc",
+  "calcium",
+  "vitC",
+  "vitD",
+];
+
 /** Estima cuántas semanas faltan para llegar a la meta con el déficit actual. */
 export function weeksToGoal(
   currentKg: number,
