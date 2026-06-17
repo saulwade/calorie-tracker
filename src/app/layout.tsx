@@ -1,5 +1,12 @@
 import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
 
 export const metadata: Metadata = {
   title: "Mis Calorías",
@@ -7,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0f0e",
+  themeColor: "#f9fafb",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -19,8 +26,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
-      <body className="min-h-screen">{children}</body>
+    <html lang="es" className={inter.variable}>
+      <body
+        className="min-h-screen"
+        style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+      >
+        {children}
+      </body>
     </html>
   );
 }

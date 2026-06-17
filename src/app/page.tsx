@@ -61,7 +61,7 @@ export default function TodayPage() {
         <h1 className="text-2xl font-bold">Hoy</h1>
       </header>
 
-      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] card-shadow p-5">
         <div className="mb-5 flex justify-center">
           <CalorieRing
             consumed={totals.calories}

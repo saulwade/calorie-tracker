@@ -75,7 +75,7 @@ export default function SettingsPage() {
         </p>
       </header>
 
-      <section className="mb-4 space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+      <section className="mb-4 space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] card-shadow p-4">
         <Field label="Sexo">
           <div className="flex gap-2">
             {(["male", "female"] as const).map((s) => (
@@ -158,7 +158,7 @@ export default function SettingsPage() {
         </Field>
       </section>
 
-      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] card-shadow p-4">
         <h2 className="mb-3 text-sm font-medium text-[var(--color-muted)]">
           Metas diarias calculadas
         </h2>
@@ -176,7 +176,7 @@ export default function SettingsPage() {
       <button
         onClick={save}
         disabled={saving}
-        className="mb-3 w-full rounded-xl bg-[var(--color-accent)] py-3 font-medium text-black active:scale-[0.98] disabled:opacity-50"
+        className="mb-3 w-full rounded-full bg-[var(--color-accent)] py-3 font-medium text-[var(--color-on-accent)] active:scale-[0.98] disabled:opacity-50"
       >
         {saving ? "Guardando…" : saved ? "✓ Guardado" : "Guardar y recalcular"}
       </button>

@@ -67,7 +67,7 @@ export default function HistoryPage() {
             return (
               <div
                 key={d.day}
-                className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3"
+                className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] card-shadow p-3"
               >
                 <div className="mb-1.5 flex items-baseline justify-between">
                   <span className="font-medium capitalize">

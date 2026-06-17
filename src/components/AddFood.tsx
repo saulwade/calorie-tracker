@@ -142,7 +142,7 @@ export default function AddFood({ onAdded }: { onAdded: () => void }) {
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+    <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] card-shadow p-3">
       {photo && (
         <div className="relative mb-2 inline-block">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -206,11 +206,11 @@ export default function AddFood({ onAdded }: { onAdded: () => void }) {
         <button
           onClick={submit}
           disabled={loading}
-          className="ml-auto flex items-center gap-2 rounded-xl bg-[var(--color-accent)] px-5 py-2.5 font-medium text-black transition active:scale-[0.98] disabled:opacity-50"
+          className="ml-auto flex items-center gap-2 rounded-full bg-[var(--color-accent)] px-5 py-2.5 font-medium text-[var(--color-on-accent)] transition active:scale-[0.98] disabled:opacity-50"
         >
           {loading ? (
             <>
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
               Analizando…
             </>
           ) : (

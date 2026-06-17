@@ -65,7 +65,7 @@ export default function WeightPage() {
         <h1 className="text-2xl font-bold">Peso</h1>
       </header>
 
-      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] card-shadow p-5">
         <div className="flex items-end justify-between">
           <div>
             <div className="text-xs text-[var(--color-muted)]">Actual</div>
@@ -108,7 +108,7 @@ export default function WeightPage() {
         )}
       </section>
 
-      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] card-shadow p-3">
         <div className="flex gap-2">
           <input
             type="number"
@@ -122,7 +122,7 @@ export default function WeightPage() {
           <button
             onClick={save}
             disabled={saving || !input}
-            className="rounded-xl bg-[var(--color-accent)] px-5 font-medium text-black active:scale-95 disabled:opacity-50"
+            className="rounded-full bg-[var(--color-accent)] px-5 font-medium text-[var(--color-on-accent)] active:scale-95 disabled:opacity-50"
           >
             {saving ? "…" : "Guardar"}
           </button>
@@ -139,7 +139,7 @@ export default function WeightPage() {
             return (
               <div
                 key={w.id}
-                className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2"
+                className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] card-shadow px-3 py-2"
               >
                 <span className="w-20 text-xs capitalize text-[var(--color-muted)]">
                   {relativeDay(w.day, today)}

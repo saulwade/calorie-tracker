@@ -44,7 +44,7 @@ export default function MealCard({
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+    <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] card-shadow p-3">
       <button
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-start gap-3 text-left"

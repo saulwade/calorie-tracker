@@ -32,7 +32,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center p-6">
       <form
         onSubmit={submit}
-        className="w-full max-w-sm rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6"
+        className="w-full max-w-sm rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] card-shadow p-6"
       >
         <div className="mb-1 text-3xl">🥗</div>
         <h1 className="mb-1 text-xl font-semibold">Mis Calorías</h1>
@@ -53,7 +53,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-xl bg-[var(--color-accent)] px-4 py-3 font-medium text-black transition active:scale-[0.98] disabled:opacity-50"
+          className="w-full rounded-full bg-[var(--color-accent)] px-4 py-3 font-medium text-[var(--color-on-accent)] transition active:scale-[0.98] disabled:opacity-50"
         >
           {loading ? "Entrando…" : "Entrar"}
         </button>

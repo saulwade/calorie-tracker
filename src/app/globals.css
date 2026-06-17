@@ -1,22 +1,24 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0b0f0e;
-  --color-surface: #141a18;
-  --color-surface-2: #1c2421;
-  --color-border: #28332f;
-  --color-text: #e8efeb;
-  --color-muted: #8aa097;
-  --color-accent: #34d399;
-  --color-accent-dim: #10b981;
-  --color-protein: #60a5fa;
-  --color-carbs: #fbbf24;
-  --color-fat: #f472b6;
-  --color-danger: #f87171;
+  /* Paleta clara estilo "Amy" — minimal, Apple Notes */
+  --color-bg: #f9fafb; /* fondo gris muy claro */
+  --color-surface: #ffffff; /* tarjetas blancas */
+  --color-surface-2: #f3f4f6; /* chips / tracks de barras */
+  --color-border: #e5e7eb; /* bordes suaves */
+  --color-text: #1f2937; /* texto principal (gris 800) */
+  --color-muted: #6b7280; /* texto secundario (gris 500) */
+  --color-accent: #4200ff; /* azul vivo (acento estrella de Amy) */
+  --color-accent-dim: #3600cc;
+  --color-on-accent: #ffffff; /* texto sobre el acento */
+  --color-protein: #16a34a; /* verde */
+  --color-carbs: #f59e0b; /* ámbar */
+  --color-fat: #ec4899; /* rosa */
+  --color-danger: #dc2626; /* rojo */
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html,
@@ -26,9 +28,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-body {
-  font-family:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+/* Sombra suave para tarjetas (look limpio sobre fondo claro) */
+.card-shadow {
+  box-shadow:
+    0 1px 2px rgba(17, 24, 39, 0.04),
+    0 4px 16px rgba(17, 24, 39, 0.04);
 }
 
 /* Scrollbar discreto */
