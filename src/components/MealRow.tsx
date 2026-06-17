@@ -5,12 +5,6 @@ import type { Meal, Profile } from "@/db/schema";
 import { SparkleIcon, TrashIcon, SendIcon, StarIcon } from "./icons";
 import { mealAlerts } from "@/lib/alerts";
 
-const CONF_LABEL: Record<string, string> = {
-  alta: "Confianza alta",
-  media: "Confianza media",
-  baja: "Confianza baja",
-};
-
 export function scoreColor(s: number): string {
   if (s >= 8) return "var(--color-fat)"; // verde
   if (s >= 6) return "var(--color-protein)"; // ámbar
@@ -66,21 +60,6 @@ export default function MealRow({
     carbs: meal.carbs,
     fat: meal.fat,
   });
-
-  let vitamins: { name: string; amount: number; unit: string }[] = [];
-  try {
-    vitamins = JSON.parse(meal.vitamins);
-  } catch {}
-
-  let items: {
-    nombre: string;
-    gramos: number;
-    kcal: number;
-    fuente: "USDA" | "estimado";
-  }[] = [];
-  try {
-    items = JSON.parse(meal.items);
-  } catch {}
 
   async function del() {
     setDeleting(true);
@@ -187,62 +166,6 @@ export default function MealRow({
                 <span>Azúcar {Math.round(meal.sugar)}g</span>
                 <span>Sodio {Math.round(meal.sodium)}mg</span>
               </div>
-
-              {items.length > 0 && (
-                <div className="mb-3">
-                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--color-muted)]">
-                    Desglose
-                  </p>
-                  <div className="space-y-1">
-                    {items.map((it, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center gap-2 text-[12px]"
-                      >
-                        <span className="flex-1 text-[var(--color-text)]">
-                          {it.nombre}
-                          <span className="text-[var(--color-muted)]">
-                            {" "}
-                            · {Math.round(it.gramos)}g
-                          </span>
-                        </span>
-                        <span className="tabular-nums text-[var(--color-muted)]">
-                          {Math.round(it.kcal)} cal
-                        </span>
-                        <span
-                          className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${
-                            it.fuente === "USDA"
-                              ? "bg-[var(--color-fat)]/12 text-[var(--color-fat)]"
-                              : "bg-[var(--color-surface-2)] text-[var(--color-muted)]"
-                          }`}
-                        >
-                          {it.fuente}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {vitamins.length > 0 && (
-                <div className="mb-3 flex flex-wrap gap-1.5">
-                  {vitamins.map((v, i) => (
-                    <span
-                      key={i}
-                      className="rounded-full bg-[var(--color-surface-2)] px-2.5 py-1 text-[11px] text-[var(--color-muted)]"
-                    >
-                      {v.name} {v.amount}
-                      {v.unit}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {meal.notes && (
-                <p className="mb-3 text-[12px] leading-relaxed text-[var(--color-muted)]">
-                  {meal.notes}
-                </p>
-              )}
 
               {/* Ajustar por chat */}
               <div className="mb-2 flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-2)] px-1.5 py-1">
