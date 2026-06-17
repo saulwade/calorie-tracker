@@ -11,8 +11,20 @@ export type ComposerPayload = {
 
 const MAX_PHOTOS = 4;
 
+function isHeic(f: File): boolean {
+  return /heic|heif/i.test(f.type) || /\.(heic|heif)$/i.test(f.name);
+}
+
+/** Convierte HEIC (iPhone) a JPEG; deja igual los demás formatos. */
+async function toSupportedBlob(file: File): Promise<Blob> {
+  if (!isHeic(file)) return file;
+  const heic2any = (await import("heic2any")).default;
+  const out = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+  return Array.isArray(out) ? out[0] : (out as Blob);
+}
+
 async function fileToCompressedBase64(
-  file: File,
+  file: Blob,
 ): Promise<{ base64: string; mediaType: string }> {
   const dataUrl: string = await new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -53,6 +65,8 @@ export default function Composer({
   const [listening, setListening] = useState(false);
   const [usedVoice, setUsedVoice] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
+  const [photoError, setPhotoError] = useState("");
+  const [converting, setConverting] = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const recRef = useRef<any>(null);
@@ -144,15 +158,33 @@ export default function Composer({
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
+    setPhotoError("");
+    setConverting(true);
     const room = MAX_PHOTOS - photos.length;
-    const added = await Promise.all(
-      files.slice(0, room).map(async (file) => {
-        const { base64, mediaType } = await fileToCompressedBase64(file);
-        return { preview: URL.createObjectURL(file), base64, mediaType };
-      }),
-    );
-    setPhotos((prev) => [...prev, ...added]);
-    if (fileRef.current) fileRef.current.value = "";
+    try {
+      const results = await Promise.all(
+        files.slice(0, room).map(async (file) => {
+          try {
+            const blob = await toSupportedBlob(file); // HEIC -> JPEG
+            const { base64, mediaType } = await fileToCompressedBase64(blob);
+            return { preview: URL.createObjectURL(blob), base64, mediaType };
+          } catch {
+            return null;
+          }
+        }),
+      );
+      const ok = results.filter(
+        (r): r is { preview: string; base64: string; mediaType: string } =>
+          r !== null,
+      );
+      if (ok.length < files.slice(0, room).length) {
+        setPhotoError("No pude leer una de las fotos. Intenta con otra.");
+      }
+      if (ok.length) setPhotos((prev) => [...prev, ...ok]);
+    } finally {
+      setConverting(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
   }
 
   function submit() {
@@ -176,6 +208,17 @@ export default function Composer({
 
   return (
     <div className="mx-auto max-w-md px-3">
+      {converting && (
+        <p className="mb-2 flex items-center justify-center gap-2 text-[12px] text-[var(--color-muted)]">
+          <span className="h-3 w-3 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-accent)]" />
+          Preparando foto…
+        </p>
+      )}
+      {photoError && (
+        <p className="mb-2 text-center text-[12px] text-[var(--color-danger)]">
+          {photoError}
+        </p>
+      )}
       {photos.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2">
           {photos.map((ph, i) => (
@@ -219,7 +262,7 @@ export default function Composer({
         <input
           ref={fileRef}
           type="file"
-          accept="image/*"
+          accept="image/*,.heic,.heif"
           multiple
           onChange={handleFile}
           className="hidden"
