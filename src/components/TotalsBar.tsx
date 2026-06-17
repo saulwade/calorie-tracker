@@ -42,7 +42,7 @@ export default function TotalsBar({
     <div className="mx-auto w-full max-w-md px-3">
       <div className={`collapsible ${open ? "is-open" : ""}`}>
         <div className="collapsible-inner pb-2">
-        <div className="rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 soft-shadow">
+        <div className="max-h-[calc(100dvh-210px)] overflow-y-auto overscroll-contain rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 soft-shadow">
           <div className="mb-4 flex justify-center">
             <CalorieRing
               consumed={totals.calories}
