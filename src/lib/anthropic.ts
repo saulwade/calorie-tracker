@@ -203,6 +203,9 @@ export async function analyzeFood({
   const message = await client.messages.create({
     model: MODEL,
     max_tokens: 1500,
+    // Temperatura baja = estimaciones MÁS consistentes y reproducibles
+    // (la misma comida da prácticamente el mismo resultado).
+    temperature: 0.2,
     system: SYSTEM,
     tools: [FOOD_TOOL],
     tool_choice: { type: "tool", name: "registrar_comida" },
