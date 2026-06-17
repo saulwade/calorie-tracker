@@ -4,14 +4,18 @@ import { useEffect, useState } from "react";
 import Nav from "@/components/Nav";
 import { LeafIcon, SparkleIcon } from "@/components/icons";
 
+type Idea = { nombre: string; kcal: number; porque: string };
 type Guide = {
   focus: string;
   evita: string[];
   comeMas: string[];
-  ideas: { momento: string; nombre: string; kcal: number; porque: string }[];
+  condimentos: string[];
+  desayunos: Idea[];
+  comidas: Idea[];
+  cenas: Idea[];
 };
 
-const LS_GUIDE = "pct_guide";
+const LS_GUIDE = "pct_guide_v2";
 const LS_FOODS = "pct_foods";
 
 export default function GuidePage() {
@@ -114,7 +118,7 @@ export default function GuidePage() {
           )}
 
           <ListCard
-            title="Evita o reduce"
+            title="Deja de comprar"
             color="var(--color-danger)"
             symbol="✕"
             items={guide.evita}
@@ -125,35 +129,16 @@ export default function GuidePage() {
             symbol="✓"
             items={guide.comeMas}
           />
+          <ListCard
+            title="Condimentos para dar sabor (sin sal ni azúcar)"
+            color="var(--color-cal)"
+            symbol="•"
+            items={guide.condimentos ?? []}
+          />
 
-          {guide.ideas.length > 0 && (
-            <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 soft-shadow">
-              <h2 className="mb-3 text-sm font-semibold">Ideas de comida</h2>
-              <div className="space-y-3">
-                {guide.ideas.map((idea, i) => (
-                  <div
-                    key={i}
-                    className="border-b border-[var(--color-border)]/70 pb-3 last:border-0 last:pb-0"
-                  >
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-muted)]">
-                        {idea.momento}
-                      </span>
-                      <span className="text-[12px] tabular-nums text-[var(--color-muted)]">
-                        ~{Math.round(idea.kcal)} cal
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-[14px] font-medium text-[var(--color-text)]">
-                      {idea.nombre}
-                    </p>
-                    <p className="mt-0.5 text-[12px] leading-snug text-[var(--color-muted)]">
-                      {idea.porque}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+          <MealIdeas title="Desayuno" ideas={guide.desayunos ?? []} />
+          <MealIdeas title="Comida" ideas={guide.comidas ?? []} />
+          <MealIdeas title="Cena" ideas={guide.cenas ?? []} />
         </div>
       )}
 
@@ -166,6 +151,38 @@ export default function GuidePage() {
 
       <Nav />
     </main>
+  );
+}
+
+function MealIdeas({ title, ideas }: { title: string; ideas: Idea[] }) {
+  if (ideas.length === 0) return null;
+  return (
+    <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 soft-shadow">
+      <h2 className="mb-3 text-sm font-semibold">{title}</h2>
+      <div className="space-y-3">
+        {ideas.map((idea, i) => (
+          <div
+            key={i}
+            className="border-b border-[var(--color-border)]/70 pb-3 last:border-0 last:pb-0"
+          >
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[12px] font-semibold text-[var(--color-accent)]">
+                Opción {i + 1}
+              </span>
+              <span className="text-[12px] tabular-nums text-[var(--color-muted)]">
+                ~{Math.round(idea.kcal)} cal
+              </span>
+            </div>
+            <p className="mt-0.5 text-[14px] font-medium text-[var(--color-text)]">
+              {idea.nombre}
+            </p>
+            <p className="mt-0.5 text-[12px] leading-snug text-[var(--color-muted)]">
+              {idea.porque}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

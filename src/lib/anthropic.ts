@@ -303,12 +303,38 @@ const COACH_SYSTEM = `Eres el nutriólogo personal y coach del usuario. Tu meta 
 
 /* ============== GUÍA: comer limpio + ideas de comida ============== */
 
+export interface GuideIdea {
+  nombre: string;
+  kcal: number;
+  porque: string;
+}
+
 export interface EatingGuide {
   focus: string;
   evita: string[];
   comeMas: string[];
-  ideas: { momento: string; nombre: string; kcal: number; porque: string }[];
+  condimentos: string[];
+  desayunos: GuideIdea[];
+  comidas: GuideIdea[];
+  cenas: GuideIdea[];
 }
+
+const IDEA_ITEM = {
+  type: "object" as const,
+  properties: {
+    nombre: {
+      type: "string",
+      description:
+        "La comida sugerida en porciones reales, no gramos (ej. '3 huevos con espinaca, 2 tortillas y aguacate').",
+    },
+    kcal: { type: "number", description: "Calorías aproximadas" },
+    porque: {
+      type: "string",
+      description: "1 frase corta: por qué es buena opción (energía, proteína, micronutrientes…).",
+    },
+  },
+  required: ["nombre", "kcal", "porque"],
+};
 
 const GUIDE_TOOL: Anthropic.Tool = {
   name: "guia_alimentacion",
@@ -323,35 +349,43 @@ const GUIDE_TOOL: Anthropic.Tool = {
       evita: {
         type: "array",
         items: { type: "string" },
-        description: "3-6 alimentos o hábitos que debería EVITAR o reducir, personalizados a lo que come y a su objetivo. Frases cortas con el por qué (ej. 'Embutidos como jamón y salchicha: muy altos en sodio').",
+        description: "3-6 alimentos o productos que debería DEJAR DE COMPRAR o reducir (lista de súper), personalizados. Frases cortas con el por qué (ej. 'Embutidos como jamón y salchicha: muy altos en sodio').",
       },
       comeMas: {
         type: "array",
         items: { type: "string" },
         description: "3-6 alimentos que debería COMER MÁS para comer limpio y tener energía (proteína magra, verduras, fibra, grasas buenas, micronutrientes). Con un beneficio corto.",
       },
-      ideas: {
+      condimentos: {
         type: "array",
-        description: "3-6 ideas de comidas concretas para él, usando alimentos que suele comprar y comida mexicana económica. En porciones reales, no gramos.",
-        items: {
-          type: "object",
-          properties: {
-            momento: { type: "string", description: "Desayuno, Comida, Cena o Snack" },
-            nombre: { type: "string", description: "La comida sugerida, en porciones reales (ej. '3 huevos con espinaca, 2 tortillas y aguacate')" },
-            kcal: { type: "number", description: "Calorías aproximadas" },
-            porque: { type: "string", description: "1 frase: por qué es buena opción (energía, proteína, micronutrientes…)" },
-          },
-          required: ["momento", "nombre", "kcal", "porque"],
-        },
+        items: { type: "string" },
+        description: "4-6 condimentos/sazonadores para dar SABOR sin sodio ni azúcar (ej. 'Limón y ajo', 'Comino y orégano', 'Chile en polvo', 'Vinagre balsámico', 'Hierbas frescas'). Con un toque de para qué sirve.",
+      },
+      desayunos: {
+        type: "array",
+        description: "EXACTAMENTE 3 opciones de DESAYUNO con los alimentos que suele comprar.",
+        items: IDEA_ITEM,
+      },
+      comidas: {
+        type: "array",
+        description: "EXACTAMENTE 3 opciones de COMIDA (almuerzo fuerte) con sus alimentos.",
+        items: IDEA_ITEM,
+      },
+      cenas: {
+        type: "array",
+        description: "EXACTAMENTE 3 opciones de CENA (ligera) con sus alimentos.",
+        items: IDEA_ITEM,
       },
     },
-    required: ["focus", "evita", "comeMas", "ideas"],
+    required: ["focus", "evita", "comeMas", "condimentos", "desayunos", "comidas", "cenas"],
   },
 };
 
 const GUIDE_SYSTEM = `Eres el nutriólogo personal del usuario. Tu meta: ayudarlo a COMER LIMPIO, bajar de peso y tener ENERGÍA todo el día (no solo contar calorías).
 - Personaliza según sus metas, lo que ha estado comiendo y los alimentos que suele comprar.
 - Prioriza comida real, mínimamente procesada, rica en micronutrientes (hierro, potasio, magnesio, B12, omega-3, vitaminas).
+- Da EXACTAMENTE 3 opciones por cada tiempo de comida (desayuno, comida, cena), variadas entre sí.
+- Sugiere condimentos para dar sabor SIN sal ni azúcar (clave porque está cuidando el sodio).
 - Habla en PORCIONES DE COMIDA REAL, nunca en gramos. Comida mexicana, accesible y realista.
 - Tono cercano y motivador, sin regaños y SIN emojis.
 - Responde SIEMPRE llamando a la herramienta 'guia_alimentacion'. Todo en español.`;
@@ -371,11 +405,11 @@ export async function generateGuide(input: {
   const userText = `Metas diarias: ~${input.targets.calories} kcal, ${input.targets.protein}g proteína, ${input.targets.fiber}g fibra, máx ${input.targets.sugar}g azúcar, máx ${input.targets.sodium}mg sodio. Objetivo: bajar de peso comiendo limpio y con energía.
 ${pantry}
 Lo que ha comido últimamente: ${recent}.
-Genera mi guía: qué evitar, qué comer más, e ideas de comidas concretas con esos alimentos.`;
+Genera mi guía: qué dejar de comprar, qué comer más, qué condimentos usar, y 3 opciones para cada tiempo (desayuno, comida y cena) con esos alimentos.`;
 
   const message = await client.messages.create({
     model: MODEL,
-    max_tokens: 1500,
+    max_tokens: 2000,
     system: GUIDE_SYSTEM,
     tools: [GUIDE_TOOL],
     tool_choice: { type: "tool", name: "guia_alimentacion" },
@@ -387,11 +421,15 @@ Genera mi guía: qué evitar, qué comer más, e ideas de comidas concretas con 
   );
   if (!toolUse) throw new Error("No se pudo generar la guía.");
   const o = toolUse.input as Partial<EatingGuide>;
+  const ideas = (v: unknown): GuideIdea[] => (Array.isArray(v) ? (v as GuideIdea[]) : []);
   return {
     focus: o.focus ?? "",
     evita: Array.isArray(o.evita) ? o.evita : [],
     comeMas: Array.isArray(o.comeMas) ? o.comeMas : [],
-    ideas: Array.isArray(o.ideas) ? o.ideas : [],
+    condimentos: Array.isArray(o.condimentos) ? o.condimentos : [],
+    desayunos: ideas(o.desayunos),
+    comidas: ideas(o.comidas),
+    cenas: ideas(o.cenas),
   };
 }
 
