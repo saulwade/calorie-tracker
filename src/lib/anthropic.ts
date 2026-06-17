@@ -393,9 +393,10 @@ const IDEA_ITEM = {
   required: ["nombre", "kcal", "porque"],
 };
 
-const GUIDE_TOOL: Anthropic.Tool = {
-  name: "guia_alimentacion",
-  description: "Genera una guía personalizada para que el usuario coma más limpio y tenga energía.",
+// Las LISTAS (enfoque, súper, evitar, condimentos) — una llamada.
+const GUIDE_LISTS_TOOL: Anthropic.Tool = {
+  name: "guia_listas",
+  description: "Enfoque, lista del súper por grupos, qué evitar y condimentos.",
   input_schema: {
     type: "object",
     properties: {
@@ -431,6 +432,18 @@ const GUIDE_TOOL: Anthropic.Tool = {
         description:
           "5-7 condimentos/sazonadores para dar SABOR. ACLARA claramente qué sí puede usar y cómo: la SAL en MODERACIÓN está bien (no prohibida), la PIMIENTA es LIBRE (no tiene sodio), y agrega limón, ajo, comino, chile en polvo, hierbas, vinagre. Cada uno con una nota corta (ej. 'Sal: úsala con medida, una pizca, no de más', 'Pimienta: libre, dale sabor sin sodio').",
       },
+    },
+    required: ["focus", "compra", "evita", "condimentos"],
+  },
+};
+
+// Las RECETAS (3 por tiempo) — otra llamada, en paralelo.
+const GUIDE_RECIPES_TOOL: Anthropic.Tool = {
+  name: "guia_recetas",
+  description: "3 opciones de comida para cada tiempo: desayuno, comida y cena.",
+  input_schema: {
+    type: "object",
+    properties: {
       desayunos: {
         type: "array",
         description: "EXACTAMENTE 3 opciones de DESAYUNO con los alimentos que suele comprar.",
@@ -447,7 +460,7 @@ const GUIDE_TOOL: Anthropic.Tool = {
         items: IDEA_ITEM,
       },
     },
-    required: ["focus", "compra", "evita", "condimentos", "desayunos", "comidas", "cenas"],
+    required: ["desayunos", "comidas", "cenas"],
   },
 };
 
@@ -472,34 +485,55 @@ export async function generateGuide(input: {
     ? `Alimentos que suele comer / tiene en casa: ${input.pantry.trim()}.`
     : "No especificó alimentos; usa básicos saludables comunes en México (huevo, pollo, atún, salmón, frijoles, verduras, avena, fruta, arroz, tortilla de maíz).";
 
-  const userText = `Metas diarias: ~${input.targets.calories} kcal, ${input.targets.protein}g proteína, ${input.targets.fiber}g fibra, máx ${input.targets.sugar}g azúcar, máx ${input.targets.sodium}mg sodio. Objetivo: bajar de peso fácil, sin estrés y aprendiendo a comer bien.
+  const base = `Metas diarias: ~${input.targets.calories} kcal, ${input.targets.protein}g proteína, ${input.targets.fiber}g fibra, máx ${input.targets.sugar}g azúcar, máx ${input.targets.sodium}mg sodio. Objetivo: bajar de peso fácil, sin estrés y aprendiendo a comer bien.
 ${pantry}
-Lo que ha comido últimamente: ${recent}.
-Genera mi guía: una lista del súper por grupos (qué SÍ comprar), qué dejar de comprar (con reemplazo), qué condimentos puedo usar (aclara lo de la sal y la pimienta), y 3 opciones para cada tiempo (desayuno, comida y cena).`;
+Lo que ha comido últimamente: ${recent}.`;
 
-  const message = await client.messages.create({
-    model: MODEL,
-    max_tokens: 4000,
-    system: GUIDE_SYSTEM,
-    tools: [GUIDE_TOOL],
-    tool_choice: { type: "tool", name: "guia_alimentacion" },
-    messages: [{ role: "user", content: userText }],
-  });
+  const call = (tool: Anthropic.Tool, instruction: string, maxTokens: number) =>
+    client.messages.create({
+      model: MODEL,
+      max_tokens: maxTokens,
+      system: GUIDE_SYSTEM,
+      tools: [tool],
+      tool_choice: { type: "tool", name: tool.name },
+      messages: [{ role: "user", content: `${base}\n${instruction}` }],
+    });
 
-  const toolUse = message.content.find(
-    (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
-  );
-  if (!toolUse) throw new Error("No se pudo generar la guía.");
-  const o = toolUse.input as Partial<EatingGuide>;
+  const toolInput = (msg: Anthropic.Message): Record<string, unknown> => {
+    const t = msg.content.find(
+      (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
+    );
+    return (t?.input as Record<string, unknown>) ?? {};
+  };
   const ideas = (v: unknown): GuideIdea[] => (Array.isArray(v) ? (v as GuideIdea[]) : []);
+
+  // Dos llamadas EN PARALELO (más rápido y sin truncamiento).
+  const [listsMsg, recipesMsg] = await Promise.all([
+    call(
+      GUIDE_LISTS_TOOL,
+      "Dame: el enfoque de la semana, la lista del súper por grupos (qué SÍ comprar), qué dejar de comprar (con su reemplazo) y los condimentos (aclara lo de la sal y la pimienta).",
+      2000,
+    ),
+    call(
+      GUIDE_RECIPES_TOOL,
+      "Dame EXACTAMENTE 3 opciones de desayuno, 3 de comida y 3 de cena, usando los alimentos del usuario.",
+      2500,
+    ),
+  ]);
+
+  const lists = toolInput(listsMsg);
+  const recipes = toolInput(recipesMsg);
+
   return {
-    focus: o.focus ?? "",
-    compra: Array.isArray(o.compra) ? (o.compra as ShopGroup[]) : [],
-    evita: Array.isArray(o.evita) ? o.evita : [],
-    condimentos: Array.isArray(o.condimentos) ? o.condimentos : [],
-    desayunos: ideas(o.desayunos),
-    comidas: ideas(o.comidas),
-    cenas: ideas(o.cenas),
+    focus: typeof lists.focus === "string" ? lists.focus : "",
+    compra: Array.isArray(lists.compra) ? (lists.compra as ShopGroup[]) : [],
+    evita: Array.isArray(lists.evita) ? (lists.evita as string[]) : [],
+    condimentos: Array.isArray(lists.condimentos)
+      ? (lists.condimentos as string[])
+      : [],
+    desayunos: ideas(recipes.desayunos),
+    comidas: ideas(recipes.comidas),
+    cenas: ideas(recipes.cenas),
   };
 }
 
