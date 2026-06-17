@@ -309,10 +309,15 @@ export interface GuideIdea {
   porque: string;
 }
 
+export interface ShopGroup {
+  categoria: string;
+  items: string[];
+}
+
 export interface EatingGuide {
   focus: string;
+  compra: ShopGroup[];
   evita: string[];
-  comeMas: string[];
   condimentos: string[];
   desayunos: GuideIdea[];
   comidas: GuideIdea[];
@@ -346,20 +351,33 @@ const GUIDE_TOOL: Anthropic.Tool = {
         type: "string",
         description: "1 frase con el enfoque principal de la semana para este usuario.",
       },
+      compra: {
+        type: "array",
+        description:
+          "Lista del súper organizada por grupo. Incluye 5 categorías EN ESTE ORDEN: 'Carbohidratos', 'Proteínas', 'Verduras', 'Grasas buenas', 'Lácteos'. En cada una, 3-6 alimentos CONCRETOS y accesibles en México que SÍ debe comprar (positivo, no prohibiciones). En carbohidratos aclara cuáles sí (ej. 'Arroz (un puño por comida)', 'Avena', 'Tortilla de maíz', 'Camote', 'Frijoles'). En lácteos sugiere quesos magros (panela, requesón, cottage) en vez de cheddar/manchego.",
+        items: {
+          type: "object",
+          properties: {
+            categoria: { type: "string", description: "Nombre del grupo (ej. 'Carbohidratos')" },
+            items: {
+              type: "array",
+              items: { type: "string" },
+              description: "3-6 alimentos concretos a comprar de ese grupo, con porción o nota breve si ayuda.",
+            },
+          },
+          required: ["categoria", "items"],
+        },
+      },
       evita: {
         type: "array",
         items: { type: "string" },
-        description: "3-6 alimentos o productos que debería DEJAR DE COMPRAR o reducir (lista de súper), personalizados. Frases cortas con el por qué (ej. 'Embutidos como jamón y salchicha: muy altos en sodio').",
-      },
-      comeMas: {
-        type: "array",
-        items: { type: "string" },
-        description: "3-6 alimentos que debería COMER MÁS para comer limpio y tener energía (proteína magra, verduras, fibra, grasas buenas, micronutrientes). Con un beneficio corto.",
+        description: "3-6 productos que debería DEJAR DE COMPRAR o reducir, SIEMPRE con su reemplazo saludable (ej. 'Pan blanco → cámbialo por tortilla de maíz o pan integral'). Frases cortas.",
       },
       condimentos: {
         type: "array",
         items: { type: "string" },
-        description: "4-6 condimentos/sazonadores para dar SABOR sin sodio ni azúcar (ej. 'Limón y ajo', 'Comino y orégano', 'Chile en polvo', 'Vinagre balsámico', 'Hierbas frescas'). Con un toque de para qué sirve.",
+        description:
+          "5-7 condimentos/sazonadores para dar SABOR. ACLARA claramente qué sí puede usar y cómo: la SAL en MODERACIÓN está bien (no prohibida), la PIMIENTA es LIBRE (no tiene sodio), y agrega limón, ajo, comino, chile en polvo, hierbas, vinagre. Cada uno con una nota corta (ej. 'Sal: úsala con medida, una pizca, no de más', 'Pimienta: libre, dale sabor sin sodio').",
       },
       desayunos: {
         type: "array",
@@ -377,17 +395,17 @@ const GUIDE_TOOL: Anthropic.Tool = {
         items: IDEA_ITEM,
       },
     },
-    required: ["focus", "evita", "comeMas", "condimentos", "desayunos", "comidas", "cenas"],
+    required: ["focus", "compra", "evita", "condimentos", "desayunos", "comidas", "cenas"],
   },
 };
 
-const GUIDE_SYSTEM = `Eres el nutriólogo personal del usuario. Tu meta: ayudarlo a COMER LIMPIO, bajar de peso y tener ENERGÍA todo el día (no solo contar calorías).
-- Personaliza según sus metas, lo que ha estado comiendo y los alimentos que suele comprar.
-- Prioriza comida real, mínimamente procesada, rica en micronutrientes (hierro, potasio, magnesio, B12, omega-3, vitaminas).
-- Da EXACTAMENTE 3 opciones por cada tiempo de comida (desayuno, comida, cena), variadas entre sí.
-- Sugiere condimentos para dar sabor SIN sal ni azúcar (clave porque está cuidando el sodio).
-- Habla en PORCIONES DE COMIDA REAL, nunca en gramos. Comida mexicana, accesible y realista.
-- Tono cercano y motivador, sin regaños y SIN emojis.
+const GUIDE_SYSTEM = `Eres el nutriólogo personal del usuario. Tu meta: ayudarlo a COMER LIMPIO, bajar de peso fácil y SIN estrés, aprendiendo a comer bien.
+- Sé POSITIVO y claro: en vez de solo prohibir, dile qué SÍ comprar y comer. Si quitas algo, da el reemplazo.
+- Arma una LISTA DEL SÚPER por grupos (carbohidratos, proteínas, verduras, grasas buenas, lácteos) con alimentos concretos y accesibles en México.
+- Aclara los condimentos: la sal con moderación está bien y la pimienta/especias son libres. Que no piense que no puede usar NADA de sal.
+- Da EXACTAMENTE 3 opciones por cada tiempo de comida (desayuno, comida, cena), variadas y apetecibles.
+- Prioriza comida real, rica en micronutrientes (hierro, potasio, magnesio, B12, omega-3).
+- Habla en PORCIONES DE COMIDA REAL, nunca en gramos. Tono cercano, motivador, sin regaños y SIN emojis.
 - Responde SIEMPRE llamando a la herramienta 'guia_alimentacion'. Todo en español.`;
 
 export async function generateGuide(input: {
@@ -402,14 +420,14 @@ export async function generateGuide(input: {
     ? `Alimentos que suele comer / tiene en casa: ${input.pantry.trim()}.`
     : "No especificó alimentos; usa básicos saludables comunes en México (huevo, pollo, atún, salmón, frijoles, verduras, avena, fruta, arroz, tortilla de maíz).";
 
-  const userText = `Metas diarias: ~${input.targets.calories} kcal, ${input.targets.protein}g proteína, ${input.targets.fiber}g fibra, máx ${input.targets.sugar}g azúcar, máx ${input.targets.sodium}mg sodio. Objetivo: bajar de peso comiendo limpio y con energía.
+  const userText = `Metas diarias: ~${input.targets.calories} kcal, ${input.targets.protein}g proteína, ${input.targets.fiber}g fibra, máx ${input.targets.sugar}g azúcar, máx ${input.targets.sodium}mg sodio. Objetivo: bajar de peso fácil, sin estrés y aprendiendo a comer bien.
 ${pantry}
 Lo que ha comido últimamente: ${recent}.
-Genera mi guía: qué dejar de comprar, qué comer más, qué condimentos usar, y 3 opciones para cada tiempo (desayuno, comida y cena) con esos alimentos.`;
+Genera mi guía: una lista del súper por grupos (qué SÍ comprar), qué dejar de comprar (con reemplazo), qué condimentos puedo usar (aclara lo de la sal y la pimienta), y 3 opciones para cada tiempo (desayuno, comida y cena).`;
 
   const message = await client.messages.create({
     model: MODEL,
-    max_tokens: 2000,
+    max_tokens: 4000,
     system: GUIDE_SYSTEM,
     tools: [GUIDE_TOOL],
     tool_choice: { type: "tool", name: "guia_alimentacion" },
@@ -424,8 +442,8 @@ Genera mi guía: qué dejar de comprar, qué comer más, qué condimentos usar, 
   const ideas = (v: unknown): GuideIdea[] => (Array.isArray(v) ? (v as GuideIdea[]) : []);
   return {
     focus: o.focus ?? "",
+    compra: Array.isArray(o.compra) ? (o.compra as ShopGroup[]) : [],
     evita: Array.isArray(o.evita) ? o.evita : [],
-    comeMas: Array.isArray(o.comeMas) ? o.comeMas : [],
     condimentos: Array.isArray(o.condimentos) ? o.condimentos : [],
     desayunos: ideas(o.desayunos),
     comidas: ideas(o.comidas),

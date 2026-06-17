@@ -3,34 +3,50 @@
 import { useEffect, useState } from "react";
 import Nav from "@/components/Nav";
 import { LeafIcon, SparkleIcon } from "@/components/icons";
+import { localDay, relativeDay } from "@/lib/dates";
 
 type Idea = { nombre: string; kcal: number; porque: string };
+type ShopGroup = { categoria: string; items: string[] };
 type Guide = {
   focus: string;
+  compra: ShopGroup[];
   evita: string[];
-  comeMas: string[];
   condimentos: string[];
   desayunos: Idea[];
   comidas: Idea[];
   cenas: Idea[];
 };
 
-const LS_GUIDE = "pct_guide_v2";
+const LS_GUIDE = "pct_guide_v3";
 const LS_FOODS = "pct_foods";
+const LS_DATE = "pct_guide_date";
+
+// color por categoría de la lista del súper
+const CAT_COLOR: Record<string, string> = {
+  Carbohidratos: "var(--color-carbs)",
+  Proteínas: "var(--color-protein)",
+  Verduras: "var(--color-fat)",
+  "Grasas buenas": "var(--color-cal)",
+  Lácteos: "var(--color-accent)",
+};
 
 export default function GuidePage() {
   const [foods, setFoods] = useState("");
   const [guide, setGuide] = useState<Guide | null>(null);
+  const [genDate, setGenDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState(false);
+  const today = localDay();
 
-  // recuperar la última guía guardada (para no regenerar y no gastar IA)
   useEffect(() => {
     try {
       const g = localStorage.getItem(LS_GUIDE);
       const f = localStorage.getItem(LS_FOODS);
+      const d = localStorage.getItem(LS_DATE);
       if (g) setGuide(JSON.parse(g));
       if (f) setFoods(f);
+      if (d) setGenDate(d);
     } catch {}
   }, []);
 
@@ -46,9 +62,12 @@ export default function GuidePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Error");
       setGuide(data.guide);
+      setGenDate(today);
+      setEditing(false);
       try {
         localStorage.setItem(LS_GUIDE, JSON.stringify(data.guide));
         localStorage.setItem(LS_FOODS, foods.trim());
+        localStorage.setItem(LS_DATE, today);
       } catch {}
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al generar.");
@@ -56,6 +75,8 @@ export default function GuidePage() {
       setLoading(false);
     }
   }
+
+  const showInput = !guide || editing;
 
   return (
     <main className="mx-auto max-w-md px-5 pb-28 pt-6">
@@ -65,44 +86,87 @@ export default function GuidePage() {
           Comer limpio
         </h1>
         <p className="text-[13px] text-[var(--color-muted)]">
-          Tu guía para comer bien, con energía y bajar de peso.
+          Tu guía para comer bien y bajar de peso sin estrés.
         </p>
       </header>
 
-      <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 soft-shadow">
-        <label className="mb-1.5 block text-[13px] font-medium">
-          ¿Qué sueles comer o tienes en casa?
-        </label>
-        <textarea
-          value={foods}
-          onChange={(e) => setFoods(e.target.value)}
-          rows={3}
-          placeholder="Ej: huevo, tortilla, frijoles, pechuga de pollo, salmón, atún de sobre, arroz, verduras, queso panela…"
-          className="w-full resize-none rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2.5 text-[14px] outline-none focus:border-[var(--color-accent)] placeholder:text-[var(--color-muted)]"
-        />
-        <button
-          onClick={generate}
-          disabled={loading}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-[var(--color-accent)] py-3 font-medium text-white transition active:scale-[0.98] disabled:opacity-60"
-        >
-          {loading ? (
-            <>
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-              Armando tu guía…
-            </>
-          ) : (
-            <>
-              <SparkleIcon size={15} />
-              {guide ? "Actualizar mi guía" : "Generar mi guía"}
-            </>
+      {/* Input: completo si no hay guía o estás editando; compacto si ya hay guía */}
+      {showInput ? (
+        <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 soft-shadow">
+          <label className="mb-1.5 block text-[13px] font-medium">
+            ¿Qué sueles comer o tienes en casa?
+          </label>
+          <textarea
+            value={foods}
+            onChange={(e) => setFoods(e.target.value)}
+            rows={3}
+            placeholder="Ej: huevo, tortilla, frijoles, pechuga de pollo, salmón, atún, arroz, verduras, queso panela, avena…"
+            className="w-full resize-none rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2.5 text-[14px] outline-none focus:border-[var(--color-accent)] placeholder:text-[var(--color-muted)]"
+          />
+          <div className="mt-3 flex gap-2">
+            {guide && (
+              <button
+                onClick={() => setEditing(false)}
+                className="rounded-full border border-[var(--color-border)] px-4 py-3 text-[13px] text-[var(--color-muted)]"
+              >
+                Cancelar
+              </button>
+            )}
+            <button
+              onClick={generate}
+              disabled={loading}
+              className="flex flex-1 items-center justify-center gap-2 rounded-full bg-[var(--color-accent)] py-3 font-medium text-white transition active:scale-[0.98] disabled:opacity-60"
+            >
+              {loading ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                  Armando tu guía…
+                </>
+              ) : (
+                <>
+                  <SparkleIcon size={15} />
+                  {guide ? "Generar nueva guía" : "Generar mi guía"}
+                </>
+              )}
+            </button>
+          </div>
+          {error && (
+            <p className="mt-2 text-center text-[13px] text-[var(--color-danger)]">
+              {error}
+            </p>
           )}
-        </button>
-        {error && (
-          <p className="mt-2 text-center text-[13px] text-[var(--color-danger)]">
-            {error}
-          </p>
-        )}
-      </section>
+          {guide && (
+            <p className="mt-2 text-center text-[11px] text-[var(--color-muted)]">
+              Genera de nuevo cuando cambien tus alimentos o quieras variar las recetas.
+            </p>
+          )}
+        </section>
+      ) : (
+        <section className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 soft-shadow">
+          <div className="min-w-0">
+            <p className="truncate text-[13px] text-[var(--color-text)]">
+              {foods || "Tu guía personalizada"}
+            </p>
+            {genDate && (
+              <p className="text-[11px] text-[var(--color-muted)]">
+                Generada {relativeDay(genDate, today).toLowerCase()}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={() => setEditing(true)}
+            className="shrink-0 rounded-full border border-[var(--color-border)] px-3 py-2 text-[12px] font-medium text-[var(--color-accent)] transition active:scale-95"
+          >
+            Editar / regenerar
+          </button>
+        </section>
+      )}
+
+      {loading && !guide && (
+        <p className="px-2 pt-6 text-center text-[13px] text-[var(--color-muted)]">
+          Armando tu guía personalizada…
+        </p>
+      )}
 
       {guide && (
         <div className="space-y-4">
@@ -117,6 +181,41 @@ export default function GuidePage() {
             </div>
           )}
 
+          {/* Lista del súper por grupos */}
+          {guide.compra?.length > 0 && (
+            <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 soft-shadow">
+              <h2 className="mb-1 text-sm font-semibold">Tu lista del súper</h2>
+              <p className="mb-3 text-[12px] text-[var(--color-muted)]">
+                Compra de estos grupos y comes bien sin pensarle.
+              </p>
+              <div className="space-y-3.5">
+                {guide.compra.map((g) => (
+                  <div key={g.categoria}>
+                    <div className="mb-1.5 flex items-center gap-1.5">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ background: CAT_COLOR[g.categoria] ?? "var(--color-muted)" }}
+                      />
+                      <span className="text-[13px] font-semibold text-[var(--color-text)]">
+                        {g.categoria}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {g.items.map((it, i) => (
+                        <span
+                          key={i}
+                          className="rounded-full bg-[var(--color-surface-2)] px-2.5 py-1 text-[12px] text-[var(--color-text)]"
+                        >
+                          {it}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           <ListCard
             title="Deja de comprar"
             color="var(--color-danger)"
@@ -124,13 +223,7 @@ export default function GuidePage() {
             items={guide.evita}
           />
           <ListCard
-            title="Come más"
-            color="var(--color-fat)"
-            symbol="✓"
-            items={guide.comeMas}
-          />
-          <ListCard
-            title="Condimentos para dar sabor (sin sal ni azúcar)"
+            title="Condimentos que sí puedes usar"
             color="var(--color-cal)"
             symbol="•"
             items={guide.condimentos ?? []}
@@ -144,8 +237,8 @@ export default function GuidePage() {
 
       {!guide && !loading && (
         <p className="px-2 text-center text-[13px] text-[var(--color-muted)]">
-          Escribe tus alimentos y genera tu guía personalizada. Se guarda para
-          que no gastes de más.
+          Escribe tus alimentos y genera tu guía. Se guarda para que no gastes de
+          más.
         </p>
       )}
 
@@ -159,21 +252,24 @@ function MealIdeas({ title, ideas }: { title: string; ideas: Idea[] }) {
   return (
     <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 soft-shadow">
       <h2 className="mb-3 text-sm font-semibold">{title}</h2>
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {ideas.map((idea, i) => (
           <div
             key={i}
-            className="border-b border-[var(--color-border)]/70 pb-3 last:border-0 last:pb-0"
+            className="rounded-xl bg-[var(--color-surface-2)] p-3"
           >
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-[12px] font-semibold text-[var(--color-accent)]">
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--color-accent)]">
+                <span className="grid h-5 w-5 place-items-center rounded-full bg-[var(--color-accent)] text-[11px] text-white">
+                  {i + 1}
+                </span>
                 Opción {i + 1}
               </span>
               <span className="text-[12px] tabular-nums text-[var(--color-muted)]">
                 ~{Math.round(idea.kcal)} cal
               </span>
             </div>
-            <p className="mt-0.5 text-[14px] font-medium text-[var(--color-text)]">
+            <p className="text-[14px] font-medium leading-snug text-[var(--color-text)]">
               {idea.nombre}
             </p>
             <p className="mt-0.5 text-[12px] leading-snug text-[var(--color-muted)]">
@@ -205,7 +301,10 @@ function ListCard({
       </h2>
       <ul className="space-y-2">
         {items.map((it, i) => (
-          <li key={i} className="flex gap-2.5 text-[14px] leading-snug text-[var(--color-text)]">
+          <li
+            key={i}
+            className="flex gap-2.5 text-[14px] leading-snug text-[var(--color-text)]"
+          >
             <span className="mt-0.5 shrink-0 font-bold" style={{ color }}>
               {symbol}
             </span>
