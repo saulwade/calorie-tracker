@@ -51,28 +51,35 @@ export function calcTargets(input: TargetInput): Targets {
   // TDEE = gasto total estimado
   const tdee = Math.round(bmr * ACTIVITY_FACTORS[activity]);
 
-  // Meta = TDEE - déficit, con un piso de seguridad (no bajar de ~1200/1500)
-  const floor = sex === "male" ? 1500 : 1200;
+  // Meta = TDEE - déficit, con piso de seguridad:
+  // nunca bajar del 90% del BMR ni de un mínimo absoluto por sexo.
+  // (Comer muy por debajo del BMR no es sostenible ni saludable.)
+  const absFloor = sex === "male" ? 1500 : 1200;
+  const floor = Math.max(absFloor, Math.round(bmr * 0.9));
   const calories = Math.max(floor, tdee - deficit);
 
-  // Proteína: alta para conservar músculo en déficit (~1.8 g/kg del peso meta)
-  const protein = Math.round(goalWeightKg * 1.8);
+  // Proteína: alta para conservar músculo en déficit (2.0 g/kg del peso meta).
+  // Respaldado por ISSN para fases de pérdida de grasa.
+  const protein = Math.round(goalWeightKg * 2.0);
 
-  // Grasa: ~25% de las calorías (9 kcal/g)
-  const fat = Math.round((calories * 0.25) / 9);
+  // Grasa: ~25% de las calorías, con piso de grasa esencial (0.6 g/kg de peso actual).
+  const fat = Math.max(
+    Math.round((calories * 0.25) / 9),
+    Math.round(0.6 * weightKg),
+  );
 
   // Carbohidratos: el resto de las calorías (4 kcal/g)
   const proteinKcal = protein * 4;
   const fatKcal = fat * 9;
   const carbs = Math.max(0, Math.round((calories - proteinKcal - fatKcal) / 4));
 
-  // Fibra: ~14 g por cada 1000 kcal
+  // Fibra: ~14 g por cada 1000 kcal (guía Dietary Guidelines / IOM)
   const fiber = Math.round((calories / 1000) * 14);
 
-  // Sodio: límite recomendado
+  // Sodio: límite superior recomendado (AHA/FDA: < 2300 mg/día)
   const sodium = 2300;
 
-  // Azúcar añadida: < 10% de calorías (4 kcal/g)
+  // Azúcar total: límite ≈ 10% de las calorías (guía OMS para azúcares libres, 4 kcal/g)
   const sugar = Math.round((calories * 0.1) / 4);
 
   return { calories, protein, carbs, fat, fiber, sodium, sugar, tdee, bmr };
