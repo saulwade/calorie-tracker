@@ -157,6 +157,7 @@ export default function TodayPage() {
               profile={profile}
               open={goalsOpen}
               onToggle={() => setGoalsOpen((o) => !o)}
+              day={today}
             />
           )}
           <Composer onSubmit={handleSubmit} />

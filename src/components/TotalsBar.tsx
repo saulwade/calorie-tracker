@@ -3,6 +3,7 @@
 import type { Profile } from "@/db/schema";
 import { FlameIcon } from "./icons";
 import { CalorieRing, MacroBar } from "./Stats";
+import Coach from "./Coach";
 
 export type Totals = {
   calories: number;
@@ -19,11 +20,13 @@ export default function TotalsBar({
   profile,
   open,
   onToggle,
+  day,
 }: {
   totals: Totals;
   profile: Profile;
   open: boolean;
   onToggle: () => void;
+  day: string;
 }) {
   return (
     <div className="mx-auto w-full max-w-md px-3">
@@ -80,6 +83,8 @@ export default function TotalsBar({
               /{profile.targetSodium}mg
             </span>
           </div>
+
+          <Coach day={day} />
         </div>
       )}
 

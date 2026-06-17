@@ -59,6 +59,10 @@ export const meals = sqliteTable("meals", {
   source: text("source").notNull().default("text"),
   confidence: text("confidence").notNull().default("media"),
   notes: text("notes").notNull().default(""),
+
+  // Calificación del nutriólogo (0-10) + consejo corto en porciones reales.
+  score: real("score").notNull().default(0),
+  tip: text("tip").notNull().default(""),
 });
 
 /**

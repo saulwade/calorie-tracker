@@ -10,6 +10,17 @@ const CONF_LABEL: Record<string, string> = {
   baja: "Confianza baja",
 };
 
+export function scoreColor(s: number): string {
+  if (s >= 8) return "var(--color-fat)"; // verde
+  if (s >= 6) return "var(--color-protein)"; // ámbar
+  if (s >= 4) return "var(--color-cal)"; // naranja
+  return "var(--color-danger)"; // rojo
+}
+
+function fmtScore(s: number): string {
+  return (Math.round(s * 10) / 10).toString();
+}
+
 export default function MealRow({
   meal,
   onDeleted,
@@ -40,17 +51,40 @@ export default function MealRow({
         <span className="flex-1 text-[15px] leading-snug text-[var(--color-text)]">
           {meal.name}
         </span>
-        <span className="mt-0.5 flex shrink-0 items-center gap-1 whitespace-nowrap text-[15px]">
-          <SparkleIcon size={12} className="text-[var(--color-accent)]" />
-          <span className="font-medium tabular-nums text-[var(--color-text)]">
-            {Math.round(meal.calories)}
+        <span className="mt-0.5 flex shrink-0 flex-col items-end gap-1">
+          <span className="flex items-center gap-1 whitespace-nowrap text-[15px]">
+            <SparkleIcon size={12} className="text-[var(--color-accent)]" />
+            <span className="font-medium tabular-nums text-[var(--color-text)]">
+              {Math.round(meal.calories)}
+            </span>
+            <span className="text-[var(--color-muted)]">cal</span>
           </span>
-          <span className="text-[var(--color-muted)]">cal</span>
+          {meal.score > 0 && (
+            <span
+              className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-[11px] font-semibold tabular-nums"
+              style={{ color: scoreColor(meal.score) }}
+            >
+              {fmtScore(meal.score)}/10
+            </span>
+          )}
         </span>
       </button>
 
       {open && (
         <div className="pb-4 pl-0.5 pr-1">
+          {meal.tip && (
+            <div
+              className="mb-3 flex items-start gap-2 rounded-xl bg-[var(--color-surface-2)] px-3 py-2 text-[13px] leading-snug"
+            >
+              <span
+                className="mt-0.5 shrink-0 font-semibold tabular-nums"
+                style={{ color: scoreColor(meal.score) }}
+              >
+                {fmtScore(meal.score)}
+              </span>
+              <span className="text-[var(--color-text)]">{meal.tip}</span>
+            </div>
+          )}
           <div className="mb-3 flex gap-5 text-[13px]">
             <Macro label="Proteína" value={meal.protein} color="var(--color-protein)" />
             <Macro label="Carbos" value={meal.carbs} color="var(--color-carbs)" />

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { eq, desc } from "drizzle-orm";
 import { analyzeFood } from "@/lib/anthropic";
+import { getOrCreateProfile } from "@/lib/profile";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -39,7 +40,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const analysis = await analyzeFood({ text, imageBase64, mediaType });
+    const profile = await getOrCreateProfile();
+    const goalContext = `Contexto del usuario: quiere bajar de peso de forma saludable. Sus metas diarias son ~${profile.targetCalories} kcal, ${profile.targetProtein}g proteína, ${profile.targetFiber}g fibra, máx ${profile.targetSugar}g azúcar y ${profile.targetSodium}mg sodio. Califica y aconseja con eso en mente.`;
+
+    const analysis = await analyzeFood({
+      text,
+      imageBase64,
+      mediaType,
+      goalContext,
+    });
 
     const now = Date.now();
     const inserted = await db
@@ -59,6 +68,8 @@ export async function POST(req: NextRequest) {
         source,
         confidence: analysis.confidence,
         notes: analysis.notes,
+        score: analysis.score,
+        tip: analysis.tip,
       })
       .returning();
 

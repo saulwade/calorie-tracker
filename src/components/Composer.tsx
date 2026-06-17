@@ -52,11 +52,17 @@ export default function Composer({
     mediaType: string;
   } | null>(null);
   const [listening, setListening] = useState(false);
+  const [usedVoice, setUsedVoice] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const recRef = useRef<any>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+
+  // refs para el dictado continuo
+  const baseRef = useRef(""); // texto antes de la sesión de dictado
+  const lastTextRef = useRef(""); // último texto mostrado (para no perderlo al reiniciar)
+  const manualStopRef = useRef(false); // true = el usuario pidió parar
 
   useEffect(() => {
     const SR =
@@ -66,38 +72,82 @@ export default function Composer({
     setVoiceSupported(true);
     const rec = new SR();
     rec.lang = "es-MX";
-    rec.continuous = false;
+    rec.continuous = true; // sigue escuchando hasta que el usuario pare
     rec.interimResults = true;
+
     rec.onresult = (e: any) => {
-      let t = "";
-      for (let i = e.resultIndex; i < e.results.length; i++)
-        t += e.results[i][0].transcript;
-      setText((rec._base ? rec._base + " " : "") + t);
+      let s = "";
+      for (let i = 0; i < e.results.length; i++) {
+        s += e.results[i][0].transcript;
+      }
+      const combined = (baseRef.current ? baseRef.current + " " : "") + s;
+      lastTextRef.current = combined;
+      setText(combined);
     };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
+
+    rec.onend = () => {
+      // Si el navegador lo cortó solo (silencio/límite) y el usuario NO pidió
+      // parar, conservamos lo dicho y seguimos escuchando.
+      if (!manualStopRef.current) {
+        baseRef.current = lastTextRef.current;
+        try {
+          rec.start();
+          return;
+        } catch {
+          /* si no se puede reiniciar, caemos a detener */
+        }
+      }
+      setListening(false);
+    };
+
+    rec.onerror = (e: any) => {
+      // "no-speech" / "aborted" son normales; solo detenemos en errores reales.
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        manualStopRef.current = true;
+        setListening(false);
+      }
+    };
+
     recRef.current = rec;
+    return () => {
+      manualStopRef.current = true;
+      try {
+        rec.stop();
+      } catch {}
+    };
   }, []);
 
-  // auto-resize del textarea
+  // auto-resize del textarea (crece con el contenido, máx ~120px)
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
-    ta.style.height = "0px";
+    ta.style.height = "auto";
     ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
   }, [text]);
 
-  function toggleVoice() {
+  function startVoice() {
     const rec = recRef.current;
     if (!rec) return;
-    if (listening) {
-      rec.stop();
-      setListening(false);
-    } else {
-      rec._base = text;
+    baseRef.current = text;
+    lastTextRef.current = text;
+    manualStopRef.current = false;
+    try {
       rec.start();
       setListening(true);
+      setUsedVoice(true);
+    } catch {
+      /* ya estaba activo */
     }
+  }
+
+  function stopVoice() {
+    const rec = recRef.current;
+    if (!rec) return;
+    manualStopRef.current = true;
+    try {
+      rec.stop();
+    } catch {}
+    setListening(false);
   }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -108,8 +158,9 @@ export default function Composer({
   }
 
   function submit() {
+    if (listening) stopVoice();
     if (!text.trim() && !photo) return;
-    const source = photo ? "photo" : listening ? "voice" : "text";
+    const source = photo ? "photo" : usedVoice ? "voice" : "text";
     onSubmit({
       text: text.trim() || undefined,
       imageBase64: photo?.base64,
@@ -118,6 +169,9 @@ export default function Composer({
     });
     setText("");
     setPhoto(null);
+    setUsedVoice(false);
+    baseRef.current = "";
+    lastTextRef.current = "";
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -141,6 +195,13 @@ export default function Composer({
               <CloseIcon size={12} />
             </button>
           </div>
+        </div>
+      )}
+
+      {listening && (
+        <div className="mb-2 flex items-center justify-center gap-2 text-[12px] text-[var(--color-danger)]">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--color-danger)]" />
+          Escuchando… toca el micrófono para terminar
         </div>
       )}
 
@@ -176,15 +237,16 @@ export default function Composer({
           className="max-h-[120px] flex-1 resize-none self-center bg-transparent px-1 py-2 text-[15px] leading-snug outline-none placeholder:text-[var(--color-muted)]"
         />
 
-        {voiceSupported && !canSend && (
+        {/* Micrófono: SIEMPRE visible. Toca para empezar/terminar de dictar. */}
+        {voiceSupported && (
           <button
-            onClick={toggleVoice}
+            onClick={listening ? stopVoice : startVoice}
             className={`grid h-9 w-9 shrink-0 place-items-center rounded-full transition ${
               listening
-                ? "bg-[var(--color-danger)]/10 text-[var(--color-danger)]"
+                ? "animate-pulse bg-[var(--color-danger)] text-white"
                 : "text-[var(--color-muted)] hover:bg-[var(--color-surface-2)]"
             }`}
-            aria-label="Dictar"
+            aria-label={listening ? "Terminar dictado" : "Dictar"}
           >
             <MicIcon size={21} />
           </button>
