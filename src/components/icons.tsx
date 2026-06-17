@@ -94,6 +94,13 @@ export const CloseIcon = ({ className, size }: P) => (
   </svg>
 );
 
+export const LeafIcon = ({ className, size }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="M11 20.5C5 20 3.5 14 4 7c5 .5 9 1.5 11 4.5 1.8 2.7 1.3 6.4-1 8.3-1.4 1.1-2.6 1-3 .7Z" />
+    <path d="M4 7c3 3 6 6.5 7.5 13" />
+  </svg>
+);
+
 export const TrashIcon = ({ className, size }: P) => (
   <svg {...base(size)} className={className}>
     <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />

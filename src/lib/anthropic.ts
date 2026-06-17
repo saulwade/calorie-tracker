@@ -244,6 +244,100 @@ const COACH_SYSTEM = `Eres el nutriólogo personal y coach del usuario. Tu meta 
 - Considera sus metas del día y lo que ya comió.
 - Responde SIEMPRE llamando a la herramienta 'evaluar_dia'. Todo en español.`;
 
+/* ============== GUÍA: comer limpio + ideas de comida ============== */
+
+export interface EatingGuide {
+  focus: string;
+  evita: string[];
+  comeMas: string[];
+  ideas: { momento: string; nombre: string; kcal: number; porque: string }[];
+}
+
+const GUIDE_TOOL: Anthropic.Tool = {
+  name: "guia_alimentacion",
+  description: "Genera una guía personalizada para que el usuario coma más limpio y tenga energía.",
+  input_schema: {
+    type: "object",
+    properties: {
+      focus: {
+        type: "string",
+        description: "1 frase con el enfoque principal de la semana para este usuario.",
+      },
+      evita: {
+        type: "array",
+        items: { type: "string" },
+        description: "3-6 alimentos o hábitos que debería EVITAR o reducir, personalizados a lo que come y a su objetivo. Frases cortas con el por qué (ej. 'Embutidos como jamón y salchicha: muy altos en sodio').",
+      },
+      comeMas: {
+        type: "array",
+        items: { type: "string" },
+        description: "3-6 alimentos que debería COMER MÁS para comer limpio y tener energía (proteína magra, verduras, fibra, grasas buenas, micronutrientes). Con un beneficio corto.",
+      },
+      ideas: {
+        type: "array",
+        description: "3-6 ideas de comidas concretas para él, usando alimentos que suele comprar y comida mexicana económica. En porciones reales, no gramos.",
+        items: {
+          type: "object",
+          properties: {
+            momento: { type: "string", description: "Desayuno, Comida, Cena o Snack" },
+            nombre: { type: "string", description: "La comida sugerida, en porciones reales (ej. '3 huevos con espinaca, 2 tortillas y aguacate')" },
+            kcal: { type: "number", description: "Calorías aproximadas" },
+            porque: { type: "string", description: "1 frase: por qué es buena opción (energía, proteína, micronutrientes…)" },
+          },
+          required: ["momento", "nombre", "kcal", "porque"],
+        },
+      },
+    },
+    required: ["focus", "evita", "comeMas", "ideas"],
+  },
+};
+
+const GUIDE_SYSTEM = `Eres el nutriólogo personal del usuario. Tu meta: ayudarlo a COMER LIMPIO, bajar de peso y tener ENERGÍA todo el día (no solo contar calorías).
+- Personaliza según sus metas, lo que ha estado comiendo y los alimentos que suele comprar.
+- Prioriza comida real, mínimamente procesada, rica en micronutrientes (hierro, potasio, magnesio, B12, omega-3, vitaminas).
+- Habla en PORCIONES DE COMIDA REAL, nunca en gramos. Comida mexicana, accesible y realista.
+- Tono cercano y motivador, sin regaños y SIN emojis.
+- Responde SIEMPRE llamando a la herramienta 'guia_alimentacion'. Todo en español.`;
+
+export async function generateGuide(input: {
+  targets: { calories: number; protein: number; fiber: number; sugar: number; sodium: number };
+  recentFoods: string[];
+  pantry?: string;
+}): Promise<EatingGuide> {
+  const recent = input.recentFoods.length
+    ? input.recentFoods.slice(0, 20).join("; ")
+    : "(aún no ha registrado mucho)";
+  const pantry = input.pantry?.trim()
+    ? `Alimentos que suele comer / tiene en casa: ${input.pantry.trim()}.`
+    : "No especificó alimentos; usa básicos saludables comunes en México (huevo, pollo, atún, salmón, frijoles, verduras, avena, fruta, arroz, tortilla de maíz).";
+
+  const userText = `Metas diarias: ~${input.targets.calories} kcal, ${input.targets.protein}g proteína, ${input.targets.fiber}g fibra, máx ${input.targets.sugar}g azúcar, máx ${input.targets.sodium}mg sodio. Objetivo: bajar de peso comiendo limpio y con energía.
+${pantry}
+Lo que ha comido últimamente: ${recent}.
+Genera mi guía: qué evitar, qué comer más, e ideas de comidas concretas con esos alimentos.`;
+
+  const message = await client.messages.create({
+    model: MODEL,
+    max_tokens: 1500,
+    system: GUIDE_SYSTEM,
+    tools: [GUIDE_TOOL],
+    tool_choice: { type: "tool", name: "guia_alimentacion" },
+    messages: [{ role: "user", content: userText }],
+  });
+
+  const toolUse = message.content.find(
+    (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
+  );
+  if (!toolUse) throw new Error("No se pudo generar la guía.");
+  const o = toolUse.input as Partial<EatingGuide>;
+  return {
+    focus: o.focus ?? "",
+    evita: Array.isArray(o.evita) ? o.evita : [],
+    comeMas: Array.isArray(o.comeMas) ? o.comeMas : [],
+    ideas: Array.isArray(o.ideas) ? o.ideas : [],
+  };
+}
+
 export async function coachDay(input: {
   meals: { name: string; calories: number; protein: number; carbs: number; fat: number; fiber: number; sugar: number; sodium: number }[];
   targets: { calories: number; protein: number; carbs: number; fat: number; fiber: number; sugar: number; sodium: number };
