@@ -144,7 +144,7 @@ export default function TodayPage() {
         )}
 
         {meals.map((meal) => (
-          <MealRow key={meal.id} meal={meal} onDeleted={load} />
+          <MealRow key={meal.id} meal={meal} onChanged={load} />
         ))}
       </section>
 

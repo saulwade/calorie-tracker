@@ -101,7 +101,8 @@ const FOOD_TOOL: Anthropic.Tool = {
 const SYSTEM = `Eres un asistente de nutrición experto y meticuloso. Estimas el contenido nutricional de lo que come el usuario de la forma MÁS PRECISA posible.
 
 Cómo trabajar:
-- Cuando haya FOTO y DESCRIPCIÓN juntas, ÚSALAS COMBINADAS: la foto te da la porción y el contexto visual; el texto te da lo que la foto no muestra (ingredientes, marca, preparación, cantidades exactas). Cruza ambas fuentes.
+- Cuando haya FOTO(S) y DESCRIPCIÓN juntas, ÚSALAS COMBINADAS: la foto te da la porción y el contexto visual; el texto te da lo que la foto no muestra (ingredientes, marca, preparación, cantidades exactas). Cruza ambas fuentes.
+- Puede subir VARIAS fotos (ej. la TABLA NUTRICIONAL/etiqueta del producto y el platillo). Si ves una tabla nutricional, úsala como fuente PRINCIPAL y ajústala según la porción que describió el usuario (ej. "me comí media bolsa").
 - Si la foto no alcanza a mostrar algo, complétalo con el texto; si el texto es vago, apóyate en la foto.
 - Estima la porción usando referencias visuales (plato, cubiertos, mano, envase) o las cantidades que diga el usuario.
 - Usa valores nutricionales realistas de alimentos y marcas comunes (incluye comida mexicana/latina: tortillas, salsas, aceite de cocina, etc.).
@@ -110,43 +111,46 @@ Cómo trabajar:
 - Además eres su tutor de nutrición: califica la comida (0-10) según qué tan saludable y alineada está con su objetivo, y da un 'tip' corto y amable. Los consejos van en PORCIONES DE COMIDA REAL (una palma de pollo, un puño de arroz, una fruta), NUNCA en gramos.
 - Responde SIEMPRE llamando a la herramienta 'registrar_comida', sin texto extra. Todo en español.`;
 
+type ImageInput = { base64: string; mediaType: string };
+
 type AnalyzeArgs = {
   text?: string;
-  imageBase64?: string;
-  mediaType?: string;
+  images?: ImageInput[];
   goalContext?: string;
 };
 
 export async function analyzeFood({
   text,
-  imageBase64,
-  mediaType,
+  images = [],
   goalContext,
 }: AnalyzeArgs): Promise<FoodAnalysis> {
   const content: Anthropic.ContentBlockParam[] = [];
 
-  if (imageBase64 && mediaType) {
+  for (const img of images) {
     content.push({
       type: "image",
       source: {
         type: "base64",
-        media_type: mediaType as
+        media_type: img.mediaType as
           | "image/jpeg"
           | "image/png"
           | "image/gif"
           | "image/webp",
-        data: imageBase64,
+        data: img.base64,
       },
     });
   }
 
-  const hasImage = Boolean(imageBase64);
+  const n = images.length;
   let instruction: string;
-  if (hasImage && text) {
-    instruction = `El usuario subió esta foto Y la describió así: "${text}". Combina la foto y la descripción para estimar el desglose nutricional lo más preciso posible.`;
-  } else if (hasImage) {
-    instruction =
-      "Analiza esta foto de comida y estima su desglose nutricional.";
+  if (n >= 2 && text) {
+    instruction = `El usuario subió ${n} fotos (pueden incluir la tabla nutricional del producto y/o el platillo) y describió: "${text}". Combina TODAS las fotos con la descripción para estimar el desglose lo más preciso posible.`;
+  } else if (n >= 2) {
+    instruction = `El usuario subió ${n} fotos (pueden incluir la tabla nutricional y/o el platillo). Combínalas para estimar el desglose nutricional.`;
+  } else if (n === 1 && text) {
+    instruction = `El usuario subió esta foto Y la describió así: "${text}". Combina la foto y la descripción para estimar el desglose lo más preciso posible.`;
+  } else if (n === 1) {
+    instruction = "Analiza esta foto de comida y estima su desglose nutricional.";
   } else {
     instruction = `Estima el desglose nutricional de: "${text}".`;
   }

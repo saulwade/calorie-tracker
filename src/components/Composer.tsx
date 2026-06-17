@@ -5,10 +5,11 @@ import { CameraIcon, MicIcon, SendIcon, CloseIcon } from "./icons";
 
 export type ComposerPayload = {
   text?: string;
-  imageBase64?: string;
-  mediaType?: string;
+  images?: { base64: string; mediaType: string }[];
   source: "text" | "photo" | "voice";
 };
+
+const MAX_PHOTOS = 4;
 
 async function fileToCompressedBase64(
   file: File,
@@ -46,11 +47,9 @@ export default function Composer({
   onSubmit: (p: ComposerPayload) => void;
 }) {
   const [text, setText] = useState("");
-  const [photo, setPhoto] = useState<{
-    preview: string;
-    base64: string;
-    mediaType: string;
-  } | null>(null);
+  const [photos, setPhotos] = useState<
+    { preview: string; base64: string; mediaType: string }[]
+  >([]);
   const [listening, setListening] = useState(false);
   const [usedVoice, setUsedVoice] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
@@ -117,14 +116,6 @@ export default function Composer({
     };
   }, []);
 
-  // auto-resize del textarea (crece con el contenido, máx ~120px)
-  useEffect(() => {
-    const ta = taRef.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
-  }, [text]);
-
   function startVoice() {
     const rec = recRef.current;
     if (!rec) return;
@@ -151,50 +142,69 @@ export default function Composer({
   }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const { base64, mediaType } = await fileToCompressedBase64(file);
-    setPhoto({ preview: URL.createObjectURL(file), base64, mediaType });
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    const room = MAX_PHOTOS - photos.length;
+    const added = await Promise.all(
+      files.slice(0, room).map(async (file) => {
+        const { base64, mediaType } = await fileToCompressedBase64(file);
+        return { preview: URL.createObjectURL(file), base64, mediaType };
+      }),
+    );
+    setPhotos((prev) => [...prev, ...added]);
+    if (fileRef.current) fileRef.current.value = "";
   }
 
   function submit() {
     if (listening) stopVoice();
-    if (!text.trim() && !photo) return;
-    const source = photo ? "photo" : usedVoice ? "voice" : "text";
+    if (!text.trim() && photos.length === 0) return;
+    const source = photos.length ? "photo" : usedVoice ? "voice" : "text";
     onSubmit({
       text: text.trim() || undefined,
-      imageBase64: photo?.base64,
-      mediaType: photo?.mediaType,
+      images: photos.map((p) => ({ base64: p.base64, mediaType: p.mediaType })),
       source,
     });
     setText("");
-    setPhoto(null);
+    setPhotos([]);
     setUsedVoice(false);
     baseRef.current = "";
     lastTextRef.current = "";
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  const canSend = Boolean(text.trim() || photo);
+  const canSend = Boolean(text.trim() || photos.length);
 
   return (
     <div className="mx-auto max-w-md px-3">
-      {photo && (
-        <div className="mb-2 flex">
-          <div className="relative">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={photo.preview}
-              alt="comida"
-              className="h-16 w-16 rounded-xl object-cover"
-            />
+      {photos.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-2">
+          {photos.map((ph, i) => (
+            <div key={i} className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={ph.preview}
+                alt={`comida ${i + 1}`}
+                className="h-16 w-16 rounded-xl object-cover"
+              />
+              <button
+                onClick={() =>
+                  setPhotos((prev) => prev.filter((_, j) => j !== i))
+                }
+                className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-[var(--color-text)] text-white"
+              >
+                <CloseIcon size={12} />
+              </button>
+            </div>
+          ))}
+          {photos.length < MAX_PHOTOS && (
             <button
-              onClick={() => setPhoto(null)}
-              className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-[var(--color-text)] text-white"
+              onClick={() => fileRef.current?.click()}
+              className="grid h-16 w-16 place-items-center rounded-xl border border-dashed border-[var(--color-border)] text-[var(--color-muted)]"
+              aria-label="Agregar otra foto"
             >
-              <CloseIcon size={12} />
+              <CameraIcon size={20} />
             </button>
-          </div>
+          )}
         </div>
       )}
 
@@ -210,7 +220,7 @@ export default function Composer({
           ref={fileRef}
           type="file"
           accept="image/*"
-          capture="environment"
+          multiple
           onChange={handleFile}
           className="hidden"
         />
@@ -234,7 +244,7 @@ export default function Composer({
           }}
           rows={1}
           placeholder="Describe lo que comes…"
-          className="max-h-[120px] flex-1 resize-none self-center bg-transparent px-1 py-2 text-[15px] leading-snug outline-none placeholder:text-[var(--color-muted)]"
+          className="autosize max-h-[120px] flex-1 resize-none self-center bg-transparent px-1 py-2 text-[15px] leading-snug outline-none placeholder:text-[var(--color-muted)]"
         />
 
         {/* Micrófono: SIEMPRE visible. Toca para empezar/terminar de dictar. */}
