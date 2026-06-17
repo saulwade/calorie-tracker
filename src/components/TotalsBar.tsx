@@ -1,7 +1,7 @@
 "use client";
 
 import type { Profile } from "@/db/schema";
-import { FlameIcon } from "./icons";
+import { FlameIcon, CloseIcon } from "./icons";
 import { CalorieRing, MacroBar } from "./Stats";
 import Coach from "./Coach";
 import { MICRO_TARGETS, MICRO_ORDER, type MicroKey } from "@/lib/nutrition";
@@ -40,9 +40,16 @@ export default function TotalsBar({
 }) {
   return (
     <div className="mx-auto w-full max-w-md px-3">
-      <div className={`collapsible ${open ? "is-open" : ""}`}>
-        <div className="collapsible-inner pb-2">
-        <div className="max-h-[calc(100dvh-210px)] overflow-y-auto overscroll-contain rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 soft-shadow">
+      {open && (
+        <div className="panel-in relative mb-2 rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow">
+          <button
+            onClick={onToggle}
+            aria-label="Cerrar"
+            className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-full bg-[var(--color-surface-2)] text-[var(--color-muted)] transition active:scale-90"
+          >
+            <CloseIcon size={16} />
+          </button>
+          <div className="max-h-[calc(100dvh-210px)] overflow-y-auto overscroll-contain rounded-3xl p-5">
           <div className="mb-4 flex justify-center">
             <CalorieRing
               consumed={totals.calories}
@@ -97,10 +104,10 @@ export default function TotalsBar({
 
           <MicroGrid totals={totals} />
 
-          {open && <Coach day={day} />}
+          <Coach day={day} />
+          </div>
         </div>
-        </div>
-      </div>
+      )}
 
       <button
         onClick={onToggle}

@@ -108,33 +108,26 @@ input[type="number"]::-webkit-inner-spin-button {
   will-change: transform, opacity;
 }
 
-/* Panel desplegable (grid 0fr → 1fr): anima alto sin medir px */
-.collapsible {
-  display: grid;
-  grid-template-rows: 0fr;
-  opacity: 0;
-  transform: translateY(6px);
-  transition:
-    grid-template-rows 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.24s ease,
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+/* Panel de metas: entrada suave (fade + slide-up) */
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
-.collapsible.is-open {
-  grid-template-rows: 1fr;
-  opacity: 1;
-  transform: translateY(0);
-}
-.collapsible > .collapsible-inner {
-  overflow: hidden;
-  min-height: 0;
+.panel-in {
+  animation: panel-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: bottom center;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .row-in,
+  .panel-in,
   .shimmer {
     animation: none;
-  }
-  .collapsible {
-    transition: none;
   }
 }
