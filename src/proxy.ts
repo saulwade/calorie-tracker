@@ -26,16 +26,11 @@ export async function proxy(req: NextRequest) {
 
   const expected = process.env.APP_PASSWORD;
 
-  // Sin contraseña configurada:
-  // - en producción: FAIL-CLOSED (nunca dejar la app abierta por accidente).
-  // - en desarrollo: modo abierto (cómodo en local).
+  // Contraseña OPCIONAL: si no hay APP_PASSWORD configurada, la app queda
+  // ABIERTA (el dueño la quiere así). Si algún día se define APP_PASSWORD,
+  // se activa el candado automáticamente. El tope de gasto de Anthropic es
+  // el respaldo real contra abuso de la IA.
   if (!expected || expected === "cambiame") {
-    if (process.env.NODE_ENV === "production") {
-      return NextResponse.json(
-        { error: "App sin contraseña configurada (APP_PASSWORD)." },
-        { status: 503 },
-      );
-    }
     return NextResponse.next();
   }
 
