@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Profile } from "@/db/schema";
 import Nav from "@/components/Nav";
+import ScoreStreak from "@/components/ScoreStreak";
+import WeeklySummary from "@/components/WeeklySummary";
 
 const ACTIVITY_LABELS: Record<string, string> = {
   sedentary: "Sedentario (poco o nada de ejercicio)",
@@ -74,6 +76,9 @@ export default function SettingsPage() {
           Tus datos definen las metas diarias (se recalculan al guardar).
         </p>
       </header>
+
+      <ScoreStreak />
+      <WeeklySummary />
 
       <section className="mb-4 space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow p-4">
         <Field label="Sexo">

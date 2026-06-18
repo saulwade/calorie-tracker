@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { lookupNutrients, type Nutrients } from "./usda";
+import { blendScore } from "./score";
+import { MICRO_TARGETS, MICRO_ORDER } from "./nutrition";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Sonnet por defecto: suficiente para estimar nutrición y mucho más barato que Opus.
@@ -325,20 +327,30 @@ export async function analyzeFood({
         omega3: num(llm.omega3),
       };
 
+  const calories = sum("calories");
+  const protein = sum("protein");
+  const fiber = sum("fiber");
+  const sodium = sum("sodium");
+  const sugar = sum("sugar");
+
+  // Score híbrido: parte objetiva (densidades) + juicio de la IA.
+  const llmScore = typeof input.score === "number" ? input.score : num(input.score);
+  const score = blendScore(llmScore, { calories, protein, fiber, sodium, sugar });
+
   return {
     name: input.name ?? "Comida",
-    calories: sum("calories"),
-    protein: sum("protein"),
+    calories,
+    protein,
     carbs: sum("carbs"),
     fat: sum("fat"),
-    fiber: sum("fiber"),
-    sodium: sum("sodium"),
-    sugar: sum("sugar"),
+    fiber,
+    sodium,
+    sugar,
     vitamins: [],
     micros,
     confidence: input.confidence ?? "media",
     notes: input.notes ?? "",
-    score: typeof input.score === "number" ? input.score : num(input.score),
+    score,
     tip: input.tip ?? "",
     items: computed.map((c) => c.item),
   };
@@ -356,11 +368,13 @@ export interface DayCoaching {
   verdict: string;
   good: string[];
   improve: string[];
+  avoidFoods: string[];
+  addFoods: string[];
 }
 
 const COACH_TOOL: Anthropic.Tool = {
   name: "evaluar_dia",
-  description: "Evalúa el día de alimentación completo del usuario, como su nutriólogo.",
+  description: "Evalúa el día de alimentación completo del usuario, como su coach.",
   input_schema: {
     type: "object",
     properties: {
@@ -370,7 +384,7 @@ const COACH_TOOL: Anthropic.Tool = {
       },
       verdict: {
         type: "string",
-        description: "1-2 frases resumiendo el día, en tono motivador y honesto (no regañón).",
+        description: "1-2 frases resumiendo el día, en tono motivador y honesto (no regañón). Si hubo un problema claro (ej. sodio muy alto), NÓMBRALO aquí concretamente.",
       },
       good: {
         type: "array",
@@ -382,15 +396,29 @@ const COACH_TOOL: Anthropic.Tool = {
         items: { type: "string" },
         description: "2-3 consejos para mañana, en PORCIONES DE COMIDA REAL (nunca gramos), concretos y accionables. Ej: 'Cambia el refresco por agua', 'Agrega una palma de pollo en la comida'.",
       },
+      avoidFoods: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "0-3 alimentos concretos que debe EVITAR o reducir mañana por lo que vio hoy (sobre todo si el sodio o el azúcar estuvieron altos). Solo el nombre del alimento, ej. 'embutidos', 'salsa de soya', 'refresco'. Vacío si no aplica.",
+      },
+      addFoods: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "0-3 alimentos concretos que debe SUMAR mañana para cerrar lo que le faltó (micros para energía: hierro, calcio, vit D, potasio, omega-3, etc.). Solo el nombre, ej. 'espinaca', 'salmón', 'lácteos'. Vacío si no aplica.",
+      },
     },
-    required: ["dayScore", "verdict", "good", "improve"],
+    required: ["dayScore", "verdict", "good", "improve", "avoidFoods", "addFoods"],
   },
 };
 
-const COACH_SYSTEM = `Eres el nutriólogo personal y coach del usuario. Tu meta es que aprenda a comer bien y baje de peso de forma sana, sin culpa.
+const COACH_SYSTEM = `Eres el Coach IA personal del usuario. Tu meta es que aprenda a comer bien y baje de peso de forma sana, sin culpa, mejorando un poco cada día hacia un 10/10.
 - Sé motivador, cercano y honesto. Nada de regaños. Sin emojis.
 - Da consejos en PORCIONES DE COMIDA REAL (una palma de pollo, un puño de arroz, una fruta, un vaso de agua), NUNCA en gramos.
-- Considera sus metas del día y lo que ya comió.
+- IDENTIFICA el problema #1 del día (con frecuencia es SODIO alto, o azúcar) y dilo claro, con qué alimentos bajar o evitar para lograrlo.
+- Revisa los MICRONUTRIENTES de energía (hierro, calcio, vit D, potasio, magnesio, B12, omega-3): si alguno quedó bajo, sugiere alimentos concretos para sumarlo mañana.
+- Llena 'avoidFoods' (qué reducir) y 'addFoods' (qué sumar) con alimentos concretos cuando aplique.
 - Responde SIEMPRE llamando a la herramienta 'evaluar_dia'. Todo en español.`;
 
 /* ============== GUÍA: comer limpio + ideas de comida ============== */
@@ -520,6 +548,8 @@ export async function generateGuide(input: {
   targets: { calories: number; protein: number; fiber: number; sugar: number; sodium: number };
   recentFoods: string[];
   pantry?: string;
+  avoidFoods?: string[];
+  addFoods?: string[];
 }): Promise<EatingGuide> {
   const recent = input.recentFoods.length
     ? input.recentFoods.slice(0, 20).join("; ")
@@ -528,9 +558,22 @@ export async function generateGuide(input: {
     ? `Alimentos que suele comer / tiene en casa: ${input.pantry.trim()}.`
     : "No especificó alimentos; usa básicos saludables comunes en México (huevo, pollo, atún, salmón, frijoles, verduras, avena, fruta, arroz, tortilla de maíz).";
 
+  // Recomendaciones recientes del Coach IA (cierran el ciclo: lo que el coach
+  // detectó día a día se refleja en la guía del súper).
+  const avoid = (input.avoidFoods ?? []).filter(Boolean);
+  const add = (input.addFoods ?? []).filter(Boolean);
+  const coachNote =
+    avoid.length || add.length
+      ? `\nSegún su Coach IA de los últimos días: ${
+          avoid.length ? `REDUCIR/EVITAR: ${avoid.join(", ")}.` : ""
+        } ${
+          add.length ? `SUMAR para sus micros: ${add.join(", ")}.` : ""
+        } Refleja esto en 'evita' (con reemplazo) y en la lista del súper.`
+      : "";
+
   const base = `Metas diarias: ~${input.targets.calories} kcal, ${input.targets.protein}g proteína, ${input.targets.fiber}g fibra, máx ${input.targets.sugar}g azúcar, máx ${input.targets.sodium}mg sodio. Objetivo: bajar de peso fácil, sin estrés y aprendiendo a comer bien.
 ${pantry}
-Lo que ha comido últimamente: ${recent}.`;
+Lo que ha comido últimamente: ${recent}.${coachNote}`;
 
   const call = (tool: Anthropic.Tool, instruction: string, maxTokens: number) =>
     client.messages.create({
@@ -583,6 +626,7 @@ Lo que ha comido últimamente: ${recent}.`;
 export async function coachDay(input: {
   meals: { name: string; calories: number; protein: number; carbs: number; fat: number; fiber: number; sugar: number; sodium: number }[];
   targets: { calories: number; protein: number; carbs: number; fat: number; fiber: number; sugar: number; sodium: number };
+  micros?: Partial<MealMicros>;
 }): Promise<DayCoaching> {
   const sum = (k: keyof (typeof input.meals)[number]) =>
     input.meals.reduce((a, m) => a + (Number(m[k]) || 0), 0);
@@ -607,7 +651,16 @@ export async function coachDay(input: {
     : "(no registró comidas)";
 
   const t = input.targets;
-  const userText = `Comidas de hoy:\n${mealList}\n\nTotales del día vs metas:\n- Calorías: ${totals.calories} / ${t.calories}\n- Proteína: ${totals.protein} / ${t.protein} g\n- Carbohidratos: ${totals.carbs} / ${t.carbs} g\n- Grasa: ${totals.fat} / ${t.fat} g\n- Fibra: ${totals.fiber} / ${t.fiber} g\n- Azúcar: ${totals.sugar} / máx ${t.sugar} g\n- Sodio: ${totals.sodium} / máx ${t.sodium} mg\n\nEvalúa el día y dame consejos para mañana.`;
+
+  // Línea de micros del día vs metas (para que aconseje qué sumar).
+  const mc = input.micros ?? {};
+  const microLine = MICRO_ORDER.map((k) => {
+    const meta = MICRO_TARGETS[k];
+    const val = Math.round((Number(mc[k]) || 0) * 10) / 10;
+    return `- ${meta.label}: ${val} / ${meta.target} ${meta.unit}`;
+  }).join("\n");
+
+  const userText = `Comidas de hoy:\n${mealList}\n\nTotales del día vs metas:\n- Calorías: ${totals.calories} / ${t.calories}\n- Proteína: ${totals.protein} / ${t.protein} g\n- Carbohidratos: ${totals.carbs} / ${t.carbs} g\n- Grasa: ${totals.fat} / ${t.fat} g\n- Fibra: ${totals.fiber} / ${t.fiber} g\n- Azúcar: ${totals.sugar} / máx ${t.sugar} g\n- Sodio: ${totals.sodium} / máx ${t.sodium} mg\n\nMicronutrientes del día (energía) vs metas:\n${microLine}\n\nEvalúa el día. Señala el problema #1 (¿sodio? ¿azúcar?) y qué micros quedaron bajos, con alimentos concretos para mañana.`;
 
   const message = await client.messages.create({
     model: MODEL,
@@ -629,6 +682,8 @@ export async function coachDay(input: {
     verdict: out.verdict ?? "",
     good: Array.isArray(out.good) ? out.good : [],
     improve: Array.isArray(out.improve) ? out.improve : [],
+    avoidFoods: Array.isArray(out.avoidFoods) ? out.avoidFoods : [],
+    addFoods: Array.isArray(out.addFoods) ? out.addFoods : [],
   };
 }
 

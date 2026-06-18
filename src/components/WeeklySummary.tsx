@@ -4,26 +4,24 @@ import { useEffect, useState } from "react";
 import { scoreColor } from "./MealRow";
 import { SparkleIcon } from "./icons";
 
-type Coaching = {
-  dayScore: number;
+type Week = {
+  weekScore: number;
   verdict: string;
+  tendencia: string;
   good: string[];
   improve: string[];
-  avoidFoods: string[];
-  addFoods: string[];
 };
 
-export default function Coach({ day }: { day: string }) {
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<Coaching | null>(null);
+export default function WeeklySummary() {
+  const [result, setResult] = useState<Week | null>(null);
   const [stale, setStale] = useState(false);
-  const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(false);
   const [peeked, setPeeked] = useState(false);
+  const [msg, setMsg] = useState("");
 
-  // Al abrir: carga lo guardado SIN gastar IA.
   useEffect(() => {
     let alive = true;
-    fetch(`/api/coach?day=${day}&peek=1`)
+    fetch("/api/coach/week?peek=1")
       .then((r) => r.json())
       .then((d) => {
         if (!alive) return;
@@ -37,34 +35,33 @@ export default function Coach({ day }: { day: string }) {
     return () => {
       alive = false;
     };
-  }, [day]);
+  }, []);
 
   async function evaluate(refresh = false) {
     setLoading(true);
     setMsg("");
     try {
-      const res = await fetch(
-        `/api/coach?day=${day}${refresh ? "&refresh=1" : ""}`,
-      );
+      const res = await fetch(`/api/coach/week${refresh ? "?refresh=1" : ""}`);
       const data = await res.json();
-      if (data.empty) {
-        setMsg(data.message);
-        setResult(null);
-      } else if (!res.ok) {
-        setMsg(data.error ?? "Error");
-      } else {
+      if (data.empty) setMsg(data.message);
+      else if (!res.ok) setMsg(data.error ?? "Error");
+      else {
         setResult(data.coaching);
         setStale(false);
       }
     } catch {
-      setMsg("No se pudo evaluar. Intenta de nuevo.");
+      setMsg("No se pudo generar el resumen. Intenta de nuevo.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="mt-4 border-t border-[var(--color-border)] pt-3">
+    <section className="mb-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] soft-shadow p-4">
+      <h2 className="mb-3 text-sm font-medium text-[var(--color-muted)]">
+        Resumen semanal · Coach IA
+      </h2>
+
       {!result ? (
         <button
           onClick={() => evaluate(false)}
@@ -74,12 +71,12 @@ export default function Coach({ day }: { day: string }) {
           {loading ? (
             <>
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-              Evaluando tu día…
+              Analizando tu semana…
             </>
           ) : (
             <>
               <SparkleIcon size={15} />
-              Calificar mi día con el Coach IA
+              Generar resumen de la semana
             </>
           )}
         </button>
@@ -88,19 +85,25 @@ export default function Coach({ day }: { day: string }) {
           <div className="mb-2 flex items-center gap-3">
             <div
               className="grid h-12 w-12 shrink-0 place-items-center rounded-full text-[17px] font-bold tabular-nums text-white"
-              style={{ background: scoreColor(result.dayScore) }}
+              style={{ background: scoreColor(result.weekScore) }}
             >
-              {Math.round(result.dayScore * 10) / 10}
+              {Math.round(result.weekScore * 10) / 10}
             </div>
-            <p className="text-[13px] leading-snug text-[var(--color-text)]">
-              {result.verdict}
-            </p>
+            <div>
+              <p className="text-[13px] leading-snug text-[var(--color-text)]">
+                {result.verdict}
+              </p>
+              {result.tendencia && (
+                <p className="mt-0.5 text-[12px] text-[var(--color-muted)]">
+                  {result.tendencia}
+                </p>
+              )}
+            </div>
           </div>
 
           {stale && (
             <p className="mb-2 text-[12px] text-[var(--color-cal)]">
-              Cambiaste comidas desde esta evaluación. Vuelve a evaluar para
-              actualizarla.
+              Registraste cambios esta semana. Vuelve a generar para actualizar.
             </p>
           )}
 
@@ -114,7 +117,6 @@ export default function Coach({ day }: { day: string }) {
               ))}
             </ul>
           )}
-
           {result.improve.length > 0 && (
             <ul className="space-y-1">
               {result.improve.map((t, i) => (
@@ -126,43 +128,19 @@ export default function Coach({ day }: { day: string }) {
             </ul>
           )}
 
-          {(result.avoidFoods.length > 0 || result.addFoods.length > 0) && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {result.avoidFoods.map((f, i) => (
-                <span
-                  key={`a${i}`}
-                  className="rounded-full bg-[var(--color-danger)]/10 px-2.5 py-1 text-[12px] text-[var(--color-danger)]"
-                >
-                  evita {f}
-                </span>
-              ))}
-              {result.addFoods.map((f, i) => (
-                <span
-                  key={`b${i}`}
-                  className="rounded-full bg-[var(--color-fat)]/12 px-2.5 py-1 text-[12px]"
-                  style={{ color: "var(--color-fat)" }}
-                >
-                  + {f}
-                </span>
-              ))}
-            </div>
-          )}
-
           <button
             onClick={() => evaluate(true)}
             disabled={loading}
             className="mt-3 text-[12px] text-[var(--color-muted)] underline"
           >
-            {loading ? "Evaluando…" : "Volver a evaluar"}
+            {loading ? "Generando…" : "Volver a generar"}
           </button>
         </div>
       )}
 
       {msg && (
-        <p className="mt-2 text-center text-[13px] text-[var(--color-muted)]">
-          {msg}
-        </p>
+        <p className="mt-2 text-center text-[13px] text-[var(--color-muted)]">{msg}</p>
       )}
-    </div>
+    </section>
   );
 }

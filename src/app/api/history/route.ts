@@ -6,7 +6,8 @@ export const runtime = "nodejs";
 
 /** GET /api/history?limit=30 — totales por día (más reciente primero). */
 export async function GET(req: NextRequest) {
-  const limit = Number(req.nextUrl.searchParams.get("limit") ?? 30);
+  const raw = Number(req.nextUrl.searchParams.get("limit") ?? 30);
+  const limit = Number.isFinite(raw) ? Math.min(366, Math.max(1, raw)) : 30;
 
   const rows = await db
     .select({
@@ -18,6 +19,7 @@ export async function GET(req: NextRequest) {
       fiber: sql<number>`sum(${schema.meals.fiber})`,
       sodium: sql<number>`sum(${schema.meals.sodium})`,
       sugar: sql<number>`sum(${schema.meals.sugar})`,
+      score: sql<number>`avg(${schema.meals.score})`,
       count: sql<number>`count(*)`,
     })
     .from(schema.meals)

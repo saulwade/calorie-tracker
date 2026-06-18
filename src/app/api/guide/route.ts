@@ -23,6 +23,31 @@ export async function POST(req: NextRequest) {
       .orderBy(desc(schema.meals.loggedAt))
       .limit(20);
 
+    // Recomendaciones recientes del Coach IA (últimos análisis del día) para
+    // que la guía refleje qué evitar / qué sumar.
+    const coachRows = await db
+      .select({
+        avoidFoods: schema.dayCoaching.avoidFoods,
+        addFoods: schema.dayCoaching.addFoods,
+      })
+      .from(schema.dayCoaching)
+      .orderBy(desc(schema.dayCoaching.createdAt))
+      .limit(7);
+
+    const dedup = (key: "avoidFoods" | "addFoods") => {
+      const set = new Set<string>();
+      for (const r of coachRows) {
+        try {
+          for (const f of JSON.parse(r[key]) as string[]) {
+            if (f && set.size < 6) set.add(f.toLowerCase());
+          }
+        } catch {
+          /* ignora json inválido */
+        }
+      }
+      return [...set];
+    };
+
     const guide = await generateGuide({
       targets: {
         calories: p.targetCalories,
@@ -33,6 +58,8 @@ export async function POST(req: NextRequest) {
       },
       recentFoods: recent.map((r) => r.name),
       pantry: foods,
+      avoidFoods: dedup("avoidFoods"),
+      addFoods: dedup("addFoods"),
     });
 
     return NextResponse.json({ guide });

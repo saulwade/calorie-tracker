@@ -8,6 +8,7 @@ import Composer, { type ComposerPayload } from "@/components/Composer";
 import MealRow from "@/components/MealRow";
 import Nav from "@/components/Nav";
 import TotalsBar, { type Totals } from "@/components/TotalsBar";
+import NextMealCard from "@/components/NextMealCard";
 import { GearIcon, FlameIcon, StarIcon, ClockIcon, CloseIcon } from "@/components/icons";
 
 type Pending = {
@@ -220,6 +221,14 @@ export default function TodayPage() {
               </div>
             ))}
           </div>
+        )}
+
+        {profile && meals.length > 0 && (
+          <NextMealCard
+            totals={totals}
+            profile={profile}
+            mealsLogged={meals.length}
+          />
         )}
 
         {pending.map((p) => (

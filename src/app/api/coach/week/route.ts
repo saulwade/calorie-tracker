@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
-import { sql, desc, gte } from "drizzle-orm";
-import { coachWeek } from "@/lib/anthropic";
+import { sql, desc, gte, eq } from "drizzle-orm";
+import { coachWeek, type WeekCoaching } from "@/lib/anthropic";
 import { getOrCreateProfile } from "@/lib/profile";
 import { allow, tooMany } from "@/lib/ratelimit";
 
@@ -15,11 +15,35 @@ function localDayServer(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-/** GET /api/coach/week — evaluación de los últimos 7 días por el nutriólogo. */
-export async function GET() {
+function parseSaved(row: typeof schema.weekCoaching.$inferSelect): WeekCoaching {
+  const arr = (s: string): string[] => {
+    try {
+      const v = JSON.parse(s);
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  };
+  return {
+    weekScore: row.weekScore,
+    verdict: row.verdict,
+    tendencia: row.tendencia,
+    good: arr(row.good),
+    improve: arr(row.improve),
+  };
+}
+
+/**
+ * GET /api/coach/week[?peek=1|&refresh=1] — resumen de los últimos 7 días.
+ * Guarda el resultado (no re-cobra IA salvo que cambie la semana o refresh=1).
+ */
+export async function GET(req: NextRequest) {
   try {
-    if (!allow("ai")) return tooMany();
+    const refresh = req.nextUrl.searchParams.get("refresh") === "1";
+    const peek = req.nextUrl.searchParams.get("peek") === "1";
+
     const today = new Date();
+    const weekEnding = localDayServer(today);
     const from = new Date(today);
     from.setDate(from.getDate() - 6);
     const fromDay = localDayServer(from);
@@ -49,6 +73,33 @@ export async function GET() {
       });
     }
 
+    // Firma: nº de días + calorías + sodio de la semana.
+    const cal = Math.round(rows.reduce((a, r) => a + (r.calories || 0), 0));
+    const na = Math.round(rows.reduce((a, r) => a + (r.sodium || 0), 0));
+    const signature = `${rows.length}:${cal}:${na}`;
+
+    const savedRows = await db
+      .select()
+      .from(schema.weekCoaching)
+      .where(eq(schema.weekCoaching.weekEnding, weekEnding));
+    const saved = savedRows[0];
+
+    if (peek) {
+      if (saved)
+        return NextResponse.json({
+          coaching: parseSaved(saved),
+          cached: true,
+          stale: saved.signature !== signature,
+        });
+      return NextResponse.json({ none: true });
+    }
+
+    if (!refresh && saved && saved.signature === signature) {
+      return NextResponse.json({ coaching: parseSaved(saved), cached: true });
+    }
+
+    if (!allow("ai")) return tooMany();
+
     const weights = await db
       .select({ day: schema.weights.day, weightKg: schema.weights.weightKg })
       .from(schema.weights)
@@ -70,11 +121,30 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json({ coaching });
+    const vals = {
+      weekEnding,
+      weekScore: coaching.weekScore,
+      verdict: coaching.verdict,
+      tendencia: coaching.tendencia,
+      good: JSON.stringify(coaching.good),
+      improve: JSON.stringify(coaching.improve),
+      signature,
+      createdAt: Date.now(),
+    };
+    await db
+      .insert(schema.weekCoaching)
+      .values(vals)
+      .onConflictDoUpdate({
+        target: schema.weekCoaching.weekEnding,
+        set: vals,
+      });
+
+    return NextResponse.json({ coaching, cached: false });
   } catch (err) {
     console.error("Error en coach/week:", err instanceof Error ? err.message : err);
-    const msg =
-      err instanceof Error ? err.message : "Error al evaluar la semana.";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json(
+      { error: "Error al evaluar la semana." },
+      { status: 500 },
+    );
   }
 }

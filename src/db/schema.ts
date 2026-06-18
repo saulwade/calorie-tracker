@@ -124,7 +124,40 @@ export const weights = sqliteTable("weights", {
   loggedAt: integer("logged_at").notNull(),
 });
 
+/**
+ * Análisis del día por el Coach IA (una fila por día). Se guarda para no
+ * perderlo ni re-cobrar la IA, y para llevar historial de calificaciones.
+ */
+export const dayCoaching = sqliteTable("day_coaching", {
+  day: text("day").primaryKey(),
+  dayScore: real("day_score").notNull().default(0),
+  verdict: text("verdict").notNull().default(""),
+  good: text("good").notNull().default("[]"), // JSON string[]
+  improve: text("improve").notNull().default("[]"), // JSON string[]
+  avoidFoods: text("avoid_foods").notNull().default("[]"), // JSON string[]
+  addFoods: text("add_foods").notNull().default("[]"), // JSON string[]
+  // Firma del estado de las comidas al evaluar (para saber si quedó stale).
+  signature: text("signature").notNull().default(""),
+  createdAt: integer("created_at").notNull().default(0),
+});
+
+/**
+ * Resumen semanal por el Coach IA (una fila por día-fin de ventana de 7 días).
+ */
+export const weekCoaching = sqliteTable("week_coaching", {
+  weekEnding: text("week_ending").primaryKey(), // YYYY-MM-DD (día más reciente)
+  weekScore: real("week_score").notNull().default(0),
+  verdict: text("verdict").notNull().default(""),
+  tendencia: text("tendencia").notNull().default(""),
+  good: text("good").notNull().default("[]"),
+  improve: text("improve").notNull().default("[]"),
+  signature: text("signature").notNull().default(""),
+  createdAt: integer("created_at").notNull().default(0),
+});
+
 export type Meal = typeof meals.$inferSelect;
 export type Profile = typeof profile.$inferSelect;
 export type Weight = typeof weights.$inferSelect;
 export type Favorite = typeof favorites.$inferSelect;
+export type DayCoachingRow = typeof dayCoaching.$inferSelect;
+export type WeekCoachingRow = typeof weekCoaching.$inferSelect;
