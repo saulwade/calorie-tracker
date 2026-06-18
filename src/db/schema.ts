@@ -155,9 +155,22 @@ export const weekCoaching = sqliteTable("week_coaching", {
   createdAt: integer("created_at").notNull().default(0),
 });
 
+/**
+ * Guía de alimentación generada por IA (una sola fila, id = 1). Antes vivía en
+ * localStorage del navegador (se perdía al cambiar de dominio/dispositivo);
+ * ahora se guarda en la base para que te siga a todos lados.
+ */
+export const guides = sqliteTable("guides", {
+  id: integer("id").primaryKey(),
+  data: text("data").notNull().default(""), // JSON de la guía
+  foods: text("foods").notNull().default(""), // alimentos que ingresó
+  createdAt: integer("created_at").notNull().default(0),
+});
+
 export type Meal = typeof meals.$inferSelect;
 export type Profile = typeof profile.$inferSelect;
 export type Weight = typeof weights.$inferSelect;
 export type Favorite = typeof favorites.$inferSelect;
 export type DayCoachingRow = typeof dayCoaching.$inferSelect;
 export type WeekCoachingRow = typeof weekCoaching.$inferSelect;
+export type GuideRow = typeof guides.$inferSelect;

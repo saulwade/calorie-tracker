@@ -1,12 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { generateGuide } from "@/lib/anthropic";
 import { getOrCreateProfile } from "@/lib/profile";
 import { allow, tooMany } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+/** GET /api/guide — devuelve la guía guardada (si hay), sin gastar IA. */
+export async function GET() {
+  try {
+    const rows = await db
+      .select()
+      .from(schema.guides)
+      .where(eq(schema.guides.id, 1));
+    const row = rows[0];
+    if (!row || !row.data) return NextResponse.json({ guide: null });
+    return NextResponse.json({
+      guide: JSON.parse(row.data),
+      foods: row.foods,
+      createdAt: row.createdAt,
+    });
+  } catch (err) {
+    console.error("Error leyendo guía:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ guide: null });
+  }
+}
 
 /** POST /api/guide  body: { foods?: string } — guía personalizada para comer limpio. */
 export async function POST(req: NextRequest) {
@@ -62,7 +82,22 @@ export async function POST(req: NextRequest) {
       addFoods: dedup("addFoods"),
     });
 
-    return NextResponse.json({ guide });
+    // Guarda la guía (upsert id=1) para que no se pierda ni se re-cobre.
+    const now = Date.now();
+    await db
+      .insert(schema.guides)
+      .values({
+        id: 1,
+        data: JSON.stringify(guide),
+        foods: foods ?? "",
+        createdAt: now,
+      })
+      .onConflictDoUpdate({
+        target: schema.guides.id,
+        set: { data: JSON.stringify(guide), foods: foods ?? "", createdAt: now },
+      });
+
+    return NextResponse.json({ guide, createdAt: now });
   } catch (err) {
     console.error("Error en guide:", err instanceof Error ? err.message : err);
     const msg = err instanceof Error ? err.message : "Error al generar la guía.";

@@ -17,10 +17,6 @@ type Guide = {
   cenas: Idea[];
 };
 
-const LS_GUIDE = "pct_guide_v3";
-const LS_FOODS = "pct_foods";
-const LS_DATE = "pct_guide_date";
-
 // color por categoría de la lista del súper
 const CAT_COLOR: Record<string, string> = {
   Carbohidratos: "var(--color-carbs)",
@@ -39,15 +35,21 @@ export default function GuidePage() {
   const [editing, setEditing] = useState(false);
   const today = localDay();
 
+  // Carga la guía guardada en la BASE (sigue al usuario en todos los dispositivos).
   useEffect(() => {
-    try {
-      const g = localStorage.getItem(LS_GUIDE);
-      const f = localStorage.getItem(LS_FOODS);
-      const d = localStorage.getItem(LS_DATE);
-      if (g) setGuide(JSON.parse(g));
-      if (f) setFoods(f);
-      if (d) setGenDate(d);
-    } catch {}
+    let alive = true;
+    fetch("/api/guide")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive || !d.guide) return;
+        setGuide(d.guide);
+        if (d.foods) setFoods(d.foods);
+        if (d.createdAt) setGenDate(localDay(new Date(d.createdAt)));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
   }, []);
 
   async function generate() {
@@ -64,11 +66,6 @@ export default function GuidePage() {
       setGuide(data.guide);
       setGenDate(today);
       setEditing(false);
-      try {
-        localStorage.setItem(LS_GUIDE, JSON.stringify(data.guide));
-        localStorage.setItem(LS_FOODS, foods.trim());
-        localStorage.setItem(LS_DATE, today);
-      } catch {}
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al generar.");
     } finally {
