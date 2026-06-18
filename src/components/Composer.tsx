@@ -76,12 +76,20 @@ export default function Composer({
   const baseRef = useRef(""); // texto antes de la sesión de dictado
   const lastTextRef = useRef(""); // último texto mostrado (para no perderlo al reiniciar)
   const manualStopRef = useRef(false); // true = el usuario pidió parar
+  const startTimeRef = useRef(0); // cuándo arrancó la sesión actual
+  const restartsRef = useRef(0); // reinicios automáticos (tope anti-bucle)
 
   useEffect(() => {
     const SR =
       (window as any).SpeechRecognition ||
       (window as any).webkitSpeechRecognition;
-    if (!SR) return;
+    // En iOS el dictado web es inestable (se cuelga). Mejor ocultamos el micro
+    // de la app; ahí el usuario dicta con el micrófono del teclado del iPhone.
+    const ua = window.navigator.userAgent;
+    const isIOS =
+      /iphone|ipad|ipod/i.test(ua) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (!SR || isIOS) return;
     setVoiceSupported(true);
     const rec = new SR();
     rec.lang = "es-MX";
@@ -99,18 +107,27 @@ export default function Composer({
     };
 
     rec.onend = () => {
-      // Si el navegador lo cortó solo (silencio/límite) y el usuario NO pidió
-      // parar, conservamos lo dicho y seguimos escuchando.
-      if (!manualStopRef.current) {
-        baseRef.current = lastTextRef.current;
-        try {
-          rec.start();
-          return;
-        } catch {
-          /* si no se puede reiniciar, caemos a detener */
-        }
+      if (manualStopRef.current) {
+        setListening(false);
+        return;
       }
-      setListening(false);
+      // En iPhone el reconocimiento termina al instante (no soporta dictado
+      // continuo). Si la sesión duró muy poco, o ya reiniciamos muchas veces,
+      // NO reiniciamos: eso causaba un bucle que congelaba la app.
+      const ranMs = Date.now() - startTimeRef.current;
+      if (ranMs < 1000 || restartsRef.current >= 10) {
+        setListening(false);
+        return;
+      }
+      // En escritorio (silencio/límite) sí conservamos lo dicho y seguimos.
+      baseRef.current = lastTextRef.current;
+      restartsRef.current += 1;
+      startTimeRef.current = Date.now();
+      try {
+        rec.start();
+      } catch {
+        setListening(false);
+      }
     };
 
     rec.onerror = (e: any) => {
@@ -136,6 +153,8 @@ export default function Composer({
     baseRef.current = text;
     lastTextRef.current = text;
     manualStopRef.current = false;
+    startTimeRef.current = Date.now();
+    restartsRef.current = 0;
     try {
       rec.start();
       setListening(true);
