@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sha256Hex } from "@/lib/auth";
+import { allow, tooMany } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  // Tope de intentos por IP para frenar fuerza bruta contra la contraseña.
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!allow(`login:${ip}`, 8, 60_000)) return tooMany();
+
   const { password } = await req.json();
   const expected = process.env.APP_PASSWORD;
 

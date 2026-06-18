@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Meal, Profile } from "@/db/schema";
 import { SparkleIcon, TrashIcon, SendIcon, StarIcon } from "./icons";
 import { mealAlerts } from "@/lib/alerts";
@@ -61,6 +61,20 @@ export default function MealRow({
     carbs: meal.carbs,
     fat: meal.fat,
   });
+
+  // Re-sincroniza el editor manual cuando la comida cambia (p. ej. tras una
+  // corrección por chat con IA): el componente no se remonta (key=meal.id),
+  // así que sin esto el editor mostraría los valores viejos y podría
+  // sobrescribir la corrección.
+  useEffect(() => {
+    setFields({
+      name: meal.name,
+      calories: meal.calories,
+      protein: meal.protein,
+      carbs: meal.carbs,
+      fat: meal.fat,
+    });
+  }, [meal.name, meal.calories, meal.protein, meal.carbs, meal.fat]);
 
   async function del() {
     setDeleting(true);

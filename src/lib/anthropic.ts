@@ -293,12 +293,15 @@ export async function analyzeFood({
   const sum = (k: keyof Nutrients) =>
     Math.round(computed.reduce((a, c) => a + (c.n[k] || 0), 0) * 10) / 10;
 
-  // Micros: si algún ingrediente se resolvió con USDA, usa la suma (precisa).
-  // Si NINGUNO se resolvió (USDA no disponible), usa la estimación de la IA,
-  // para que los micros NUNCA queden en 0 por falta de la base.
-  const usedUsda = computed.some((c) => c.item.fuente === "USDA");
+  // Micros: solo usamos la suma USDA (precisa) si TODOS los ingredientes se
+  // resolvieron con USDA. Si aunque sea uno quedó estimado, ese no aporta
+  // micros (USDA no los tiene), así que la suma quedaría corta — mejor usar la
+  // estimación de la IA a nivel comida, que sí cubre todos los ingredientes.
+  // Así los micros NUNCA quedan en 0 ni subcontados por falta de la base.
+  const allUsda =
+    computed.length > 0 && computed.every((c) => c.item.fuente === "USDA");
   const llm = (input.micros ?? {}) as Partial<MealMicros>;
-  const micros: MealMicros = usedUsda
+  const micros: MealMicros = allUsda
     ? {
         iron: sum("iron"),
         potassium: sum("potassium"),
@@ -511,7 +514,7 @@ const GUIDE_SYSTEM = `Eres el nutriólogo personal del usuario. Tu meta: ayudarl
 - Apunta a ~30-40 g de proteína por comida.
 - Prioriza comida real, rica en micronutrientes (hierro, potasio, magnesio, B12, omega-3).
 - Habla en PORCIONES DE COMIDA REAL, nunca en gramos. Tono cercano, motivador, sin regaños y SIN emojis.
-- Responde SIEMPRE llamando a la herramienta 'guia_alimentacion'. Todo en español.`;
+- Responde SIEMPRE usando la herramienta que se te indique en cada llamada. Todo en español.`;
 
 export async function generateGuide(input: {
   targets: { calories: number; protein: number; fiber: number; sugar: number; sodium: number };
@@ -734,7 +737,7 @@ export async function coachWeek(input: {
   const userText = `Resumen de los últimos 7 días (día por día):
 ${perDay}
 
-Días registrados: ${withData.length} de ${input.days.length || 7}.
+Días registrados: ${withData.length} de 7.
 Promedios en días con registro:
 - Calorías: ${avg("calories")} / meta ${t.calories}
 - Proteína: ${avg("protein")} / ${t.protein} g
