@@ -9,6 +9,7 @@ import MealRow from "@/components/MealRow";
 import Nav from "@/components/Nav";
 import TotalsBar, { type Totals } from "@/components/TotalsBar";
 import NextMealCard from "@/components/NextMealCard";
+import InstallHint from "@/components/InstallHint";
 import { GearIcon, FlameIcon, StarIcon, ClockIcon, CloseIcon } from "@/components/icons";
 
 type Pending = {
@@ -196,6 +197,8 @@ export default function TodayPage() {
 
       {/* Lista de comidas */}
       <section className="mx-auto max-w-md px-5 pb-[210px] pt-4">
+        <InstallHint />
+
         {favorites.length > 0 && (
           <div className="mb-3 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none]">
             {favorites.map((fav) => (
