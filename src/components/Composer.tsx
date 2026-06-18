@@ -78,18 +78,21 @@ export default function Composer({
   const manualStopRef = useRef(false); // true = el usuario pidió parar
   const startTimeRef = useRef(0); // cuándo arrancó la sesión actual
   const restartsRef = useRef(0); // reinicios automáticos (tope anti-bucle)
+  const singleShotRef = useRef(false); // iOS: una sola dictada, sin reinicio
 
   useEffect(() => {
     const SR =
       (window as any).SpeechRecognition ||
       (window as any).webkitSpeechRecognition;
-    // En iOS el dictado web es inestable (se cuelga). Mejor ocultamos el micro
-    // de la app; ahí el usuario dicta con el micrófono del teclado del iPhone.
+    if (!SR) return;
+    // En iOS el dictado web no soporta sesión continua (reiniciarla cuelga la
+    // app). Ahí lo usamos en modo "una sola dictada": arranca, escucha tu
+    // frase y se detiene, sin reiniciar.
     const ua = window.navigator.userAgent;
     const isIOS =
       /iphone|ipad|ipod/i.test(ua) ||
       (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    if (!SR || isIOS) return;
+    singleShotRef.current = isIOS;
     setVoiceSupported(true);
     const rec = new SR();
     rec.lang = "es-MX";
@@ -111,9 +114,14 @@ export default function Composer({
         setListening(false);
         return;
       }
-      // En iPhone el reconocimiento termina al instante (no soporta dictado
-      // continuo). Si la sesión duró muy poco, o ya reiniciamos muchas veces,
-      // NO reiniciamos: eso causaba un bucle que congelaba la app.
+      // iOS: una sola dictada, NUNCA reiniciar (el reinicio congelaba la app).
+      // Conservamos lo que se transcribió y paramos.
+      if (singleShotRef.current) {
+        setListening(false);
+        return;
+      }
+      // Otros navegadores: si la sesión duró muy poco o ya reiniciamos muchas
+      // veces, tampoco reiniciamos (tope anti-bucle).
       const ranMs = Date.now() - startTimeRef.current;
       if (ranMs < 1000 || restartsRef.current >= 10) {
         setListening(false);
