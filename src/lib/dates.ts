@@ -6,6 +6,15 @@ export function clockTime(ms: number): string {
   });
 }
 
+/**
+ * Fase del día según la hora local: "active" mientras tiene sentido sugerir
+ * otra comida; "closed" de noche (ya cerró el día) → consejos para mañana.
+ */
+export function dayPhase(d: Date = new Date()): "active" | "closed" {
+  const h = d.getHours();
+  return h >= 22 || h < 5 ? "closed" : "active";
+}
+
 /** Devuelve el día local (del navegador) en formato YYYY-MM-DD. */
 export function localDay(d: Date = new Date()): string {
   const y = d.getFullYear();

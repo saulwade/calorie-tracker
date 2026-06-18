@@ -32,6 +32,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  // Extiende bajo el notch/barra de gestos del iPhone (usamos safe-area en CSS).
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

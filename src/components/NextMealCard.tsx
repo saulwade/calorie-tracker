@@ -2,6 +2,7 @@
 
 import type { Profile } from "@/db/schema";
 import { nextMealPlan, type NextMealInput, type NextRec } from "@/lib/nextmeal";
+import { dayPhase } from "@/lib/dates";
 import { SparkleIcon, LeafIcon } from "./icons";
 
 function recIcon(kind: NextRec["kind"]) {
@@ -20,7 +21,7 @@ export default function NextMealCard({
   profile: Profile;
   mealsLogged: number;
 }) {
-  const plan = nextMealPlan(totals, profile, mealsLogged);
+  const plan = nextMealPlan(totals, profile, mealsLogged, dayPhase());
   const warn = plan.tone === "warn";
 
   // Color distinto al resto del chat: verde menta (ok) o ámbar (cuidado).

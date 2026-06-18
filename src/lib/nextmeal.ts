@@ -38,16 +38,73 @@ const MICRO_FOODS: Record<MicroKey, string> = {
   omega3: "salmón, atún, chía o nuez",
 };
 
+/** Micros bajos del día (< umbral del objetivo), de más a menos rezagado. */
+function lowMicros(t: NextMealInput, threshold = 0.5) {
+  return MICRO_ORDER.map((k) => {
+    const meta = MICRO_TARGETS[k];
+    const ratio = meta.target > 0 ? (t[k] || 0) / meta.target : 1;
+    return { k, ratio, label: meta.label };
+  })
+    .filter((x) => x.ratio < threshold)
+    .sort((a, b) => a.ratio - b.ratio)
+    .slice(0, 3);
+}
+
+/**
+ * Plan de CIERRE de día (de noche): ya no hay próxima comida, así que el
+ * consejo es para mañana + descanso.
+ */
+function closingPlan(t: NextMealInput, profile: Profile): NextMealPlan {
+  const recs: NextRec[] = [];
+  let tone: "ok" | "warn" = "ok";
+
+  const naPct = profile.targetSodium > 0 ? t.sodium / profile.targetSodium : 0;
+  if (naPct >= 0.9) {
+    tone = "warn";
+    recs.push({
+      kind: "avoid",
+      text: `Hoy el sodio quedó alto (${Math.round(t.sodium)} mg). Toma agua antes de dormir y mañana arranca ligero: menos embutidos, salsas y quesos salados.`,
+    });
+  }
+
+  for (const low of lowMicros(t)) {
+    recs.push({
+      kind: "add",
+      text: `Hoy faltó ${low.label.toLowerCase()} → mañana suma ${MICRO_FOODS[low.k]}.`,
+    });
+  }
+
+  const over = Math.round(t.calories - profile.targetCalories);
+  if (over > 150) {
+    tone = "warn";
+    recs.push({
+      kind: "macro",
+      text: `Cerraste ~${over} kcal por arriba de tu meta. Un día no define nada; mañana lo ajustas.`,
+    });
+  }
+
+  recs.push({
+    kind: "ok",
+    text: "Ya cerró el día. Evita comer pesado antes de dormir y descansa bien — dormir también ayuda a bajar.",
+  });
+
+  return { tone, headline: "Cierre del día", recs };
+}
+
 /**
  * @param t        totales del día (macros + micros)
  * @param profile  metas del usuario
  * @param mealsLogged  cuántas comidas lleva hoy (para estimar lo que falta)
+ * @param phase    "active" (sugiere próxima comida) o "closed" (consejos para mañana)
  */
 export function nextMealPlan(
   t: NextMealInput,
   profile: Profile,
   mealsLogged: number,
+  phase: "active" | "closed" = "active",
 ): NextMealPlan {
+  if (phase === "closed") return closingPlan(t, profile);
+
   const recs: NextRec[] = [];
   let tone: "ok" | "warn" = "ok";
 
@@ -79,16 +136,7 @@ export function nextMealPlan(
   }
 
   // 3) Micros bajos (sobre todo energía): toma los más rezagados.
-  const lows = MICRO_ORDER.map((k) => {
-    const meta = MICRO_TARGETS[k];
-    const ratio = meta.target > 0 ? (t[k] || 0) / meta.target : 1;
-    return { k, ratio, label: meta.label };
-  })
-    .filter((x) => x.ratio < 0.5)
-    .sort((a, b) => a.ratio - b.ratio)
-    .slice(0, 3);
-
-  for (const low of lows) {
+  for (const low of lowMicros(t)) {
     recs.push({
       kind: "add",
       text: `Te falta ${low.label.toLowerCase()} → mete ${MICRO_FOODS[low.k]}.`,

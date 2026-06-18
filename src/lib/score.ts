@@ -32,12 +32,15 @@ export function mealQualityScore(s: ScoreSignals): number {
   else if (protPer100 >= 4) score += 0.5;
   else if (protPer100 < 2) score -= 1;
 
-  // Sodio (mg por kcal): saludable ≈ ≤1.15 (2300 mg / ~2000 kcal).
-  const naPerKcal = s.sodium / cal;
-  if (naPerKcal <= 1.0) score += 0.5;
-  else if (naPerKcal <= 1.5) score += 0;
-  else if (naPerKcal <= 2.0) score -= 1;
-  else score -= 2.5;
+  // Sodio ABSOLUTO por comida: es la prioridad del usuario (retención de
+  // líquido), y una comida grande no debe "diluir" su sodio. ~767 mg sería
+  // 1/3 del límite diario; pasarse de ahí baja puntos.
+  const na = s.sodium;
+  if (na <= 500) score += 0.5;
+  else if (na <= 800) score += 0;
+  else if (na <= 1200) score -= 1;
+  else if (na <= 1800) score -= 2;
+  else score -= 3;
 
   // Azúcar (% de las kcal): penaliza azúcar alto.
   const sugarPct = (s.sugar * 4) / cal;

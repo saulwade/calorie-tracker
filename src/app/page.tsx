@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { Meal, Profile, Favorite } from "@/db/schema";
-import { localDay, prettyDay, calcStreakInfo } from "@/lib/dates";
+import { localDay, prettyDay, calcStreakInfo, dayPhase } from "@/lib/dates";
 import Composer, { type ComposerPayload } from "@/components/Composer";
 import MealRow from "@/components/MealRow";
 import Nav from "@/components/Nav";
@@ -135,10 +135,13 @@ export default function TodayPage() {
     omega3: sum(meals, "omega3"),
   };
 
-  // Aviso de "próxima comida" (≈3 h después de la última).
+  // Aviso de "próxima comida" (≈3 h después de la última), consciente de la hora:
+  // de noche el día ya cerró, así que no sugerimos otra comida.
   const lastMealMs = meals.reduce((mx, x) => Math.max(mx, x.loggedAt), 0);
   let nextMealHint = "";
-  if (lastMealMs) {
+  if (dayPhase() === "closed") {
+    nextMealHint = meals.length > 0 ? "Día cerrado · descansa, mañana seguimos" : "";
+  } else if (lastMealMs) {
     const diffMin = Math.round((lastMealMs + 3 * 3600_000 - Date.now()) / 60000);
     if (diffMin > 5) {
       const h = Math.floor(diffMin / 60);
@@ -309,7 +312,7 @@ export default function TodayPage() {
       </section>
 
       {/* Barra inferior: totales (con metas desplegables) + composer */}
-      <div className="fixed inset-x-0 bottom-0 z-20 pb-[72px]">
+      <div className="fixed inset-x-0 bottom-0 z-20 pb-[calc(72px+env(safe-area-inset-bottom))]">
         <div className="space-y-2 pt-2">
           {profile && (
             <TotalsBar

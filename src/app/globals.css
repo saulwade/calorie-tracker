@@ -41,6 +41,12 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Respeta el notch del iPhone en modo app (standalone). En navegador o
+   dispositivos sin notch, env(safe-area-inset-top) = 0, así que no cambia nada. */
+body {
+  padding-top: env(safe-area-inset-top);
+}
+
 /* Fuente: SF Pro en dispositivos Apple, Inter como respaldo. */
 body {
   font-family:
