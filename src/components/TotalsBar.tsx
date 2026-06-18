@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Profile } from "@/db/schema";
 import { FlameIcon, CloseIcon } from "./icons";
 import { CalorieRing, MacroBar } from "./Stats";
@@ -39,6 +40,9 @@ export default function TotalsBar({
   onToggle: () => void;
   day: string;
 }) {
+  // Pestaña activa del panel (aligera el muro de info en uno solo).
+  const [tab, setTab] = useState<"detalle" | "porciones" | "micros">("detalle");
+
   // Balance sodio/potasio (retención de agua): solo avisa cuando vale la pena.
   const naHigh = totals.sodium > profile.targetSodium * 0.8;
   const kLow = totals.potassium > 0 && totals.potassium < totals.sodium;
@@ -97,57 +101,89 @@ export default function TotalsBar({
               color="var(--color-fat)"
             />
           </div>
-          <MacroSplit profile={profile} />
-
-          <div className="mt-4 flex justify-between border-t border-[var(--color-border)] pt-3 text-[12px] text-[var(--color-muted)]">
-            <span>
-              Fibra{" "}
-              <span className="text-[var(--color-text)]">
-                {Math.round(totals.fiber)}
-              </span>
-              /{profile.targetFiber}g
-            </span>
-            <span>
-              Azúcar{" "}
-              <span className="text-[var(--color-text)]">
-                {Math.round(totals.sugar)}
-              </span>
-              /{profile.targetSugar}g
-            </span>
-            <span>
-              Sodio{" "}
-              <span className="text-[var(--color-text)]">
-                {Math.round(totals.sodium)}
-              </span>
-              /{profile.targetSodium}mg
-            </span>
+          {/* Pestañas: aligera el panel repartiendo la info en 3 vistas. */}
+          <div className="mt-4 flex gap-1 rounded-full bg-[var(--color-surface-2)] p-1">
+            {([
+              ["detalle", "Detalle"],
+              ["porciones", "Porciones"],
+              ["micros", "Micros"],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setTab(key)}
+                className={`flex-1 rounded-full py-1.5 text-[12px] font-medium transition ${
+                  tab === key
+                    ? "bg-[var(--color-surface)] text-[var(--color-text)] soft-shadow"
+                    : "text-[var(--color-muted)]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
-          {naKHint && (
-            <p className="mt-3 rounded-xl bg-[var(--color-cal)]/8 px-3 py-2 text-[12px] leading-snug text-[var(--color-text)]">
-              {naKHint}
-            </p>
-          )}
+          {tab === "detalle" && (
+            <div className="panel-in">
+              <div className="mt-4 flex justify-between text-[12px] text-[var(--color-muted)]">
+                <span>
+                  Fibra{" "}
+                  <span className="text-[var(--color-text)]">
+                    {Math.round(totals.fiber)}
+                  </span>
+                  /{profile.targetFiber}g
+                </span>
+                <span>
+                  Azúcar{" "}
+                  <span className="text-[var(--color-text)]">
+                    {Math.round(totals.sugar)}
+                  </span>
+                  /{profile.targetSugar}g
+                </span>
+                <span>
+                  Sodio{" "}
+                  <span className="text-[var(--color-text)]">
+                    {Math.round(totals.sodium)}
+                  </span>
+                  /{profile.targetSodium}mg
+                </span>
+              </div>
 
-          {showFalta && (
-            <div className="mt-4 rounded-xl bg-[var(--color-accent)]/8 px-3 py-2.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-accent)]">
-                Te falta hoy
-              </p>
-              <p className="mt-0.5 text-[13px] leading-snug text-[var(--color-text)]">
-                ~{remProtPalmas} {remProtPalmas === 1 ? "palma" : "palmas"} de
-                proteína · ~{remCarbManos}{" "}
-                {remCarbManos === 1 ? "mano" : "manos"} de carbo ·{" "}
-                <span className="tabular-nums">{remCal}</span> kcal
-              </p>
+              {naKHint && (
+                <p className="mt-3 rounded-xl bg-[var(--color-cal)]/8 px-3 py-2 text-[12px] leading-snug text-[var(--color-text)]">
+                  {naKHint}
+                </p>
+              )}
+
+              {showFalta && (
+                <div className="mt-4 rounded-xl bg-[var(--color-accent)]/8 px-3 py-2.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-accent)]">
+                    Te falta hoy
+                  </p>
+                  <p className="mt-0.5 text-[13px] leading-snug text-[var(--color-text)]">
+                    ~{remProtPalmas} {remProtPalmas === 1 ? "palma" : "palmas"} de
+                    proteína · ~{remCarbManos}{" "}
+                    {remCarbManos === 1 ? "mano" : "manos"} de carbo ·{" "}
+                    <span className="tabular-nums">{remCal}</span> kcal
+                  </p>
+                </div>
+              )}
+
+              <Coach day={day} />
             </div>
           )}
 
-          <PortionGuide profile={profile} />
+          {tab === "porciones" && (
+            <div className="panel-in">
+              <MacroSplit profile={profile} />
+              <PortionGuide profile={profile} />
+            </div>
+          )}
 
-          <MicroGrid totals={totals} />
-
-          <Coach day={day} />
+          {tab === "micros" && (
+            <div className="panel-in">
+              <MicroGrid totals={totals} />
+            </div>
+          )}
           </div>
         </div>
       )}

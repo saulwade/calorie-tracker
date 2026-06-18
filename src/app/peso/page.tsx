@@ -7,6 +7,7 @@ import { weeksToGoal } from "@/lib/nutrition";
 import { trendSeries, currentTrend, weeklyChange } from "@/lib/weight";
 import Nav from "@/components/Nav";
 import LineChart from "@/components/LineChart";
+import WeeklyWellness from "@/components/WeeklyWellness";
 
 function shortDate(day: string) {
   const [, m, d] = day.split("-");
@@ -164,6 +165,8 @@ export default function WeightPage() {
           </p>
         )}
       </section>
+
+      {profile && <WeeklyWellness profile={profile} />}
 
       {/* Aviso de agua: el dato de hoy arriba de la tendencia */}
       {weights.length > 1 && aboveTrend > 0.6 && (

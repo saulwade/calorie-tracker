@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { Meal, Profile, Favorite } from "@/db/schema";
-import { localDay, prettyDay, calcStreak } from "@/lib/dates";
+import { localDay, prettyDay, calcStreakInfo } from "@/lib/dates";
 import Composer, { type ComposerPayload } from "@/components/Composer";
 import MealRow from "@/components/MealRow";
 import Nav from "@/components/Nav";
@@ -28,25 +28,41 @@ export default function TodayPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [pending, setPending] = useState<Pending[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [goalsOpen, setGoalsOpen] = useState(false);
   const [streak, setStreak] = useState(0);
+  const [frozen, setFrozen] = useState(false);
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [addingFav, setAddingFav] = useState<number | null>(null);
   const today = localDay();
 
   const load = useCallback(async () => {
-    const [mRes, pRes, hRes, fRes] = await Promise.all([
-      fetch(`/api/meals?day=${today}`),
-      fetch(`/api/profile`),
-      fetch(`/api/history?limit=60`),
-      fetch(`/api/favorites`),
-    ]);
-    setMeals((await mRes.json()).meals ?? []);
-    setProfile((await pRes.json()).profile ?? null);
-    const days: { day: string; count: number }[] = (await hRes.json()).days ?? [];
-    setStreak(calcStreak(days.filter((d) => d.count > 0).map((d) => d.day), today));
-    setFavorites((await fRes.json()).favorites ?? []);
-    setLoading(false);
+    setError(false);
+    try {
+      const [mRes, pRes, hRes, fRes] = await Promise.all([
+        fetch(`/api/meals?day=${today}`),
+        fetch(`/api/profile`),
+        fetch(`/api/history?limit=60`),
+        fetch(`/api/favorites`),
+      ]);
+      if (!mRes.ok || !pRes.ok || !hRes.ok || !fRes.ok)
+        throw new Error("fetch failed");
+      setMeals((await mRes.json()).meals ?? []);
+      setProfile((await pRes.json()).profile ?? null);
+      const days: { day: string; count: number }[] =
+        (await hRes.json()).days ?? [];
+      const info = calcStreakInfo(
+        days.filter((d) => d.count > 0).map((d) => d.day),
+        today,
+      );
+      setStreak(info.streak);
+      setFrozen(info.frozen);
+      setFavorites((await fRes.json()).favorites ?? []);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }, [today]);
 
   async function logFavorite(fav: Favorite) {
@@ -153,10 +169,15 @@ export default function TodayPage() {
             <span
               className="flex items-center gap-1 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-[13px] font-semibold tabular-nums text-[var(--color-cal)] soft-shadow"
               aria-label={`Racha de ${streak} días`}
-              title={`Llevas ${streak} ${streak === 1 ? "día" : "días"} seguidos registrando`}
+              title={
+                frozen
+                  ? `Llevas ${streak} días. Saltaste uno, pero tu racha sigue viva (congelada ❄️) — sin dramas.`
+                  : `Llevas ${streak} ${streak === 1 ? "día" : "días"} seguidos registrando`
+              }
             >
               <FlameIcon size={14} />
               {streak}
+              {frozen && <span className="text-[12px]">❄️</span>}
             </span>
           )}
           <Link
@@ -228,7 +249,41 @@ export default function TodayPage() {
           </div>
         ))}
 
-        {!loading && meals.length === 0 && pending.length === 0 && (
+        {error && (
+          <div className="row-in mt-6 rounded-2xl border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/8 px-4 py-3 text-center">
+            <p className="text-[14px] text-[var(--color-text)]">
+              No pude cargar tus datos.
+            </p>
+            <button
+              onClick={() => {
+                setLoading(true);
+                load();
+              }}
+              className="mt-2 rounded-full bg-[var(--color-accent)] px-4 py-1.5 text-[13px] font-medium text-white active:scale-95"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+
+        {loading && meals.length === 0 && !error && (
+          <div className="space-y-1">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between border-b border-[var(--color-border)]/70 py-3.5"
+              >
+                <div className="flex flex-1 flex-col gap-2">
+                  <div className="shimmer h-3.5 w-2/5 rounded-full bg-[var(--color-surface-2)]" />
+                  <div className="shimmer h-2.5 w-1/4 rounded-full bg-[var(--color-surface-2)]" />
+                </div>
+                <div className="shimmer h-3.5 w-12 rounded-full bg-[var(--color-surface-2)]" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!loading && !error && meals.length === 0 && pending.length === 0 && (
           <div className="pt-20 text-center">
             <p className="text-[15px] text-[var(--color-muted)]">
               Aún no registras nada hoy.
