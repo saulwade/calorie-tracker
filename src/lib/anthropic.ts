@@ -247,22 +247,9 @@ export async function analyzeFood({
   const computed = await Promise.all(
     ings.map(async (ing) => {
       const grams = num(ing.gramos);
-      const hit =
-        grams > 0 && ing.usdaQuery
-          ? await lookupNutrients(ing.usdaQuery, grams)
-          : null;
-      if (hit) {
-        return {
-          item: {
-            nombre: ing.nombre ?? hit.desc,
-            gramos: grams,
-            kcal: hit.nutrients.calories,
-            fuente: "USDA" as const,
-          },
-          n: hit.nutrients,
-        };
-      }
-      const n: Nutrients = {
+
+      // Estimación de respaldo de la IA para ESTE ingrediente (sin micros).
+      const llmN: Nutrients = {
         calories: num(ing.kcal),
         protein: num(ing.protein),
         carbs: num(ing.carbs),
@@ -280,14 +267,40 @@ export async function analyzeFood({
         vitB12: 0,
         omega3: 0,
       };
+
+      const hit =
+        grams > 0 && ing.usdaQuery
+          ? await lookupNutrients(ing.usdaQuery, grams)
+          : null;
+
+      // Guardia anti-disparate: si USDA da MUCHO más calorías que la estimación
+      // de la IA para este ingrediente, seguramente emparejó el alimento
+      // equivocado (clásico: leche líquida → leche EN POLVO, ~10x). En ese caso
+      // descartamos USDA y usamos la estimación de la IA.
+      const usdaTooHigh =
+        hit !== null &&
+        llmN.calories > 0 &&
+        hit.nutrients.calories > llmN.calories * 2 + 50;
+
+      if (hit && !usdaTooHigh) {
+        return {
+          item: {
+            nombre: ing.nombre ?? hit.desc,
+            gramos: grams,
+            kcal: hit.nutrients.calories,
+            fuente: "USDA" as const,
+          },
+          n: hit.nutrients,
+        };
+      }
       return {
         item: {
           nombre: ing.nombre ?? "Ingrediente",
           gramos: grams,
-          kcal: n.calories,
+          kcal: llmN.calories,
           fuente: "estimado" as const,
         },
-        n,
+        n: llmN,
       };
     }),
   );
