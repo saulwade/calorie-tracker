@@ -54,6 +54,15 @@ export default function MealRow({
   const [faved, setFaved] = useState(false);
 
   const alerts = mealAlerts(meal, profile);
+  const items: { nombre: string; gramos: number; kcal: number; fuente: string }[] =
+    (() => {
+      try {
+        const v = JSON.parse(meal.items);
+        return Array.isArray(v) ? v : [];
+      } catch {
+        return [];
+      }
+    })();
   const [fields, setFields] = useState({
     name: meal.name,
     calories: meal.calories,
@@ -182,6 +191,38 @@ export default function MealRow({
                 <span>Azúcar {Math.round(meal.sugar)}g</span>
                 <span>Sodio {Math.round(meal.sodium)}mg</span>
               </div>
+
+              {/* Desglose por ingrediente: para ver de dónde salen las calorías
+                  y corregir porciones desde el chat de "Ajustar". */}
+              {items.length > 0 && (
+                <div className="mb-3 rounded-xl bg-[var(--color-surface-2)] px-3 py-2.5">
+                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                    Ingredientes
+                  </p>
+                  <div className="space-y-1">
+                    {items.map((it, i) => (
+                      <div
+                        key={i}
+                        className="flex items-baseline justify-between gap-2 text-[12px]"
+                      >
+                        <span className="flex-1 truncate text-[var(--color-text)]">
+                          {it.nombre}
+                          {it.fuente === "estimado" && (
+                            <span className="text-[var(--color-muted)]"> ·aprox</span>
+                          )}
+                        </span>
+                        <span className="shrink-0 tabular-nums text-[var(--color-muted)]">
+                          {Math.round(it.gramos)}g · {Math.round(it.kcal)} kcal
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[11px] leading-snug text-[var(--color-muted)]">
+                    ¿Una porción mal? Corrígela abajo en “Ajustar” (ej. “el arroz
+                    fueron 100 g”). Lo marcado “·aprox” no salió de la base USDA.
+                  </p>
+                </div>
+              )}
 
               {/* Ajustar por chat */}
               <div className="mb-2 flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-2)] px-1.5 py-1">
