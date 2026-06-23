@@ -72,6 +72,45 @@ function pickPer100(foodNutrients: any[]): Nutrients {
   };
 }
 
+// Preparaciones que SUBEN calorías; si el usuario no las pidió, las evitamos
+// (clásico: "whole egg cooked" no debe caer en "egg, fried").
+const FATTY_PREP = [
+  "fried",
+  "breaded",
+  "battered",
+  "crispy",
+  "with oil",
+  "in oil",
+  "dry milk",
+  "dried",
+  "powder",
+  "dehydrated",
+];
+
+/** Elige el MEJOR candidato de la búsqueda (no solo el primero). */
+function pickBestFood(foods: any[], query: string): any | null {
+  const qWords = query.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
+  let best: any = null;
+  let bestScore = -Infinity;
+  for (const f of foods ?? []) {
+    const desc = String(f.description ?? "").toLowerCase();
+    let score = 0;
+    // tipo de dato: Foundation (moderno, limpio) > SR Legacy
+    if (f.dataType === "Foundation") score += 3;
+    else if (f.dataType === "SR Legacy") score += 2;
+    // coincidencia de palabras de la búsqueda
+    for (const w of qWords) if (desc.includes(w)) score += 1;
+    // penaliza preparaciones grasosas/concentradas que NO se pidieron
+    for (const fp of FATTY_PREP)
+      if (desc.includes(fp) && !query.toLowerCase().includes(fp)) score -= 3;
+    if (score > bestScore) {
+      bestScore = score;
+      best = f;
+    }
+  }
+  return best;
+}
+
 /** Busca un alimento y devuelve sus nutrientes por 100g + descripción, o null. */
 async function searchPer100(
   query: string,
@@ -82,7 +121,7 @@ async function searchPer100(
   try {
     const url = `${BASE}/foods/search?api_key=${KEY}&query=${encodeURIComponent(
       query,
-    )}&dataType=${encodeURIComponent("Foundation,SR Legacy")}&pageSize=2`;
+    )}&dataType=${encodeURIComponent("Foundation,SR Legacy")}&pageSize=10`;
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 5000);
     const res = await fetch(url, { signal: ctrl.signal });
@@ -92,7 +131,7 @@ async function searchPer100(
       return null;
     }
     const data = await res.json();
-    const food = data.foods?.[0];
+    const food = pickBestFood(data.foods, query);
     if (!food) {
       cache.set(key, null); // sin resultado: cachear miss
       return null;
